@@ -3,6 +3,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Import Electron's ipcRenderer for communicating with main process
   const { ipcRenderer } = require('electron');
   
+  // Handle nova:// URLs opened from external sources
+  ipcRenderer.on('open-nova-url', (event, url) => {
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      // Open the nova URL in the current active tab
+      handleNovaPage(url, activeWebview);
+      urlInput.value = url;
+    }
+  });
+  
   // Tab management logic
   const tabsContainer = document.getElementById('tabs');
   const webviewsContainer = document.getElementById('webviews');
@@ -38,14 +48,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview) {
       let url = urlInput.value;
-    let regex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.[a-z]{2,})(\/[^\s]*)?$/i; // Regex pattern to match URLs
+      
+      // Handle nova:// internal pages
+      if (url.startsWith('nova://')) {
+        handleNovaPage(url, activeWebview);
+        return;
+      }
+      
+      let regex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.[a-z]{2,})(\/[^\s]*)?$/i; // Regex pattern to match URLs
       if (!regex.test(url)) {
         // If not a URL, treat as a Google search
         url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
       } else {
         if (!url.startsWith('http')) url = 'https://' + url;
-        }
-    activeWebview.src = url;
+      }
+      activeWebview.src = url;
     }
   });
 
@@ -80,6 +97,134 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Handle nova:// internal pages
+  function handleNovaPage(url, webview) {
+    let page = url.replace('nova://', '').toLowerCase();
+    
+    // Remove trailing slash if present
+    if (page.endsWith('/')) {
+      page = page.slice(0, -1);
+    }
+    
+    // If page is empty after removing slash, default to 'home'
+    if (page === '') {
+      page = 'home';
+    }
+    
+    // Store the original nova URL on the webview element
+    webview.dataset.novaUrl = url;
+    
+    loadNovaPage(page, webview);
+  }
+
+  // Load nova page from HTML file - automatically finds any page file
+  async function loadNovaPage(page, webview) {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      
+      // Try to find the page file
+      const filePath = path.join(__dirname, 'nova-pages', `${page}.html`);
+      
+      if (fs.existsSync(filePath)) {
+        let htmlContent = fs.readFileSync(filePath, 'utf8');
+        
+        // Replace any placeholders in the content
+        htmlContent = replacePlaceholders(htmlContent, page);
+        
+        webview.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      } else {
+        // Page doesn't exist, load 404
+        load404Page(page, webview);
+      }
+    } catch (error) {
+      console.error('Error loading nova page:', error);
+      load404Page(page, webview);
+    }
+  }
+
+  // Replace placeholders in HTML content
+  function replacePlaceholders(htmlContent, page) {
+    return htmlContent
+      .replace(/\{\{PAGE\}\}/g, page)
+      .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
+      .replace(/\{\{VERSION\}\}/g, '1.0.0');
+  }
+
+  // Load 404 page with page name
+  function load404Page(page, webview) {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      const filePath = path.join(__dirname, 'nova-pages', '404.html');
+      
+      if (fs.existsSync(filePath)) {
+        let htmlContent = fs.readFileSync(filePath, 'utf8');
+        htmlContent = replacePlaceholders(htmlContent, page);
+        webview.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      } else {
+        // Fallback if 404.html doesn't exist
+        webview.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(generateFallback404(page))}`);
+      }
+    } catch (error) {
+      console.error('Error loading 404 page:', error);
+      webview.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(generateFallback404(page))}`);
+    }
+  }
+
+  // Fallback 404 page if file loading fails
+  function generateFallback404(page) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Error - Nova Browser</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; padding: 40px; background: #f5f5f5; }
+          h1 { color: #e74c3c; }
+        </style>
+      </head>
+      <body>
+        <h1>Error</h1>
+        <p>Could not load nova://${page}</p>
+        <p><a href="nova://home">Go to Nova Home</a></p>
+      </body>
+      </html>
+    `;
+  }
+
+  // Generate home page content for new tabs
+  function generateHomePage() {
+    const path = require('path');
+    const fs = require('fs');
+    
+    try {
+      const filePath = path.join(__dirname, 'nova-pages', 'home.html');
+      if (fs.existsSync(filePath)) {
+        return fs.readFileSync(filePath, 'utf8');
+      }
+    } catch (error) {
+      console.error('Error loading home page:', error);
+    }
+    
+    // Fallback home page
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Nova Browser</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        </style>
+      </head>
+      <body>
+        <h1>Welcome to Nova Browser</h1>
+        <p><a href="nova://settings" style="color: white;">Settings</a> | <a href="nova://about" style="color: white;">About</a></p>
+      </body>
+      </html>
+    `;
+  }
+
   // Helper function to add close button to a tab
   function addCloseButtonToTab(tabButton, tabId) {
     // Check if close button already exists
@@ -108,18 +253,33 @@ document.addEventListener('DOMContentLoaded', () => {
       // Remove loading animation when page finishes loading
       if (webview.classList.contains('active')) {
         reloadBtn.classList.remove('loading');
+        
+        // Update URL bar with nova URL if it's a nova page
+        if (webview.dataset.novaUrl) {
+          urlInput.value = webview.dataset.novaUrl;
+        }
       }
     });
 
     webview.addEventListener('did-navigate', (event) => {
       if (webview.classList.contains('active')) {
-        urlInput.value = event.url;
+        // Check if this is a nova page
+        if (webview.dataset.novaUrl) {
+          urlInput.value = webview.dataset.novaUrl;
+        } else {
+          urlInput.value = event.url;
+        }
       }
     });
 
     webview.addEventListener('did-navigate-in-page', (event) => {
       if (webview.classList.contains('active')) {
-        urlInput.value = event.url;
+        // Check if this is a nova page
+        if (webview.dataset.novaUrl) {
+          urlInput.value = webview.dataset.novaUrl;
+        } else {
+          urlInput.value = event.url;
+        }
       }
     });
 
@@ -141,6 +301,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           // If no close button exists, just update the text
           tabButton.innerText = title;
+        }
+      }
+    });
+
+    // Handle messages from nova pages
+    webview.addEventListener('ipc-message', (event) => {
+      if (event.channel === 'navigate') {
+        const url = event.args[0];
+        if (url.startsWith('nova://')) {
+          handleNovaPage(url, webview);
+        } else {
+          // Clear nova URL data when navigating to external sites
+          delete webview.dataset.novaUrl;
+          webview.src = url;
+        }
+        // Update URL bar
+        if (webview.classList.contains('active')) {
+          urlInput.value = url;
         }
       }
     });
@@ -166,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create webview
     const webview = document.createElement('webview');
-    webview.src = 'https://google.com';
+    webview.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(generateHomePage());
     webview.className = 'tab-view';
     webview.dataset.id = tabId;
     webview.setAttribute('preload', 'preload.js');
@@ -204,7 +382,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update URL input with current webview URL
     const activeWebview = getActiveWebview();
     if (activeWebview) {
-      urlInput.value = activeWebview.src;
+      // Check if this is a nova page first
+      if (activeWebview.dataset.novaUrl) {
+        urlInput.value = activeWebview.dataset.novaUrl;
+      } else {
+        urlInput.value = activeWebview.src;
+      }
     }
   }
 

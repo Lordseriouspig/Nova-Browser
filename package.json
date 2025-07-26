@@ -1,6 +1,6 @@
 {
   "name": "nova-browser",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Yet another electron-based browser, Nova browser is designed to be an all-in-one browser featuring modes, AI tab grouping, and more!",
   "main": "src/main/main.js",
   "scripts": {
@@ -28,11 +28,16 @@
     "electron": "^37.2.4"
   },
   "dependencies": {
-    "lucide": "^0.525.0"
   },
   "build": {
   "appId": "com.novabrowser.app",
   "productName": "Nova Browser",
+  "protocols": [
+    {
+      "name": "nova",
+      "schemes": ["nova"]
+    }
+  ],
   "win": {
     "icon": "assets/icon/icon-win.ico"
   },

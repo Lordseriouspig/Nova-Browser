@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Browser - Home</title>
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0; padding: 40px; text-align: center; color: white;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 3em; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+    .search-box { margin: 20px 0; }
+    .search-box input { 
+      width: 400px; padding: 15px; border: none; border-radius: 25px; 
+      font-size: 16px; outline: none; text-align: center;
+    }
+    .search-box button {
+      background: rgba(255,255,255,0.2); color: white; border: none;
+      padding: 15px 25px; border-radius: 25px; margin-left: 10px;
+      cursor: pointer; font-weight: bold;
+    }
+    .search-box button:hover { background: rgba(255,255,255,0.3); }
+    .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 40px; }
+    .link-card { 
+      background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; 
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px); transition: transform 0.3s ease;
+      cursor: pointer;
+    }
+    .link-card:hover { transform: translateY(-5px); }
+    .link-card a { color: white; text-decoration: none; font-weight: bold; display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to Nova Browser</h1>
+    <p>Your gateway to the web</p>
+    
+    <div class="search-box">
+      <input type="text" id="homeSearch" placeholder="Search or enter URL..." />
+      <button onclick="performSearch()">Search</button>
+    </div>
+    
+    <div class="quick-links">
+      <div class="link-card" onclick="navigateToUrl('https://google.com')">
+        <a href="#">🔍 Google Search</a>
+      </div>
+      <div class="link-card" onclick="navigateToUrl('https://github.com')">
+        <a href="#">🐙 GitHub</a>
+      </div>
+      <div class="link-card" onclick="navigateToUrl('nova://settings')">
+        <a href="#">⚙️ Browser Settings</a>
+      </div>
+      <div class="link-card" onclick="navigateToUrl('nova://about')">
+        <a href="#">ℹ️ About Nova</a>
+      </div>
+      <div class="link-card" onclick="navigateToUrl('nova://history')">
+        <a href="#">📜 Browse History</a>
+      </div>
+      <div class="link-card" onclick="navigateToUrl('nova://bookmarks')">
+        <a href="#">📚 Bookmarks</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function navigateToUrl(url) {
+      // Use the preload script function if available
+      if (window.navigateFromNova) {
+        window.navigateFromNova(url);
+      } else {
+        // Fallback: try to navigate directly
+        window.location.href = url;
+      }
+    }
+
+    function performSearch() {
+      const searchTerm = document.getElementById('homeSearch').value;
+      if (searchTerm.trim()) {
+        // Check if it's a URL or search term
+        const urlRegex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.[a-z]{2,})(\/[^\s]*)?$/i;
+        let url;
+        
+        if (urlRegex.test(searchTerm)) {
+          url = searchTerm.startsWith('http') ? searchTerm : 'https://' + searchTerm;
+        } else {
+          url = 'https://www.google.com/search?q=' + encodeURIComponent(searchTerm);
+        }
+        
+        navigateToUrl(url);
+      }
+    }
+
+    // Allow Enter key in search box
+    document.getElementById('homeSearch').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+    });
+  </script>
+</body>
+</html>

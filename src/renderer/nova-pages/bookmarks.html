@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Browser - Bookmarks</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 40px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); }
+    h1 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+    .back-link { position: absolute; top: 20px; left: 20px; color: #667eea; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .bookmark-folder { margin: 20px 0; }
+    .folder-title { font-weight: bold; color: #333; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+    .bookmark-item { padding: 10px 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; cursor: pointer; }
+    .bookmark-item:hover { background: #f9f9f9; }
+    .bookmark-favicon { width: 16px; height: 16px; margin-right: 10px; }
+    .bookmark-title { font-weight: bold; color: #333; }
+    .bookmark-url { color: #666; font-size: 0.9em; margin-left: 10px; }
+    .add-bookmark { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; }
+    .add-bookmark:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <a href="nova://home" class="back-link">← Back to Home</a>
+  <div class="container">
+    <h1>Bookmarks</h1>
+    
+    <div class="bookmark-folder">
+      <div class="folder-title">📁 Favorites</div>
+      <div class="bookmark-item" onclick="navigateToUrl('https://google.com')">
+        <div class="bookmark-favicon">🌐</div>
+        <div class="bookmark-title">Google</div>
+        <div class="bookmark-url">https://google.com</div>
+      </div>
+      <div class="bookmark-item" onclick="navigateToUrl('https://github.com')">
+        <div class="bookmark-favicon">🐙</div>
+        <div class="bookmark-title">GitHub</div>
+        <div class="bookmark-url">https://github.com</div>
+      </div>
+    </div>
+    
+    <div class="bookmark-folder">
+      <div class="folder-title">📁 Nova Pages</div>
+      <div class="bookmark-item" onclick="navigateToUrl('nova://home')">
+        <div class="bookmark-favicon">🏠</div>
+        <div class="bookmark-title">Nova Home</div>
+        <div class="bookmark-url">nova://home</div>
+      </div>
+      <div class="bookmark-item" onclick="navigateToUrl('nova://settings')">
+        <div class="bookmark-favicon">⚙️</div>
+        <div class="bookmark-title">Settings</div>
+        <div class="bookmark-url">nova://settings</div>
+      </div>
+      <div class="bookmark-item" onclick="navigateToUrl('nova://about')">
+        <div class="bookmark-favicon">ℹ️</div>
+        <div class="bookmark-title">About</div>
+        <div class="bookmark-url">nova://about</div>
+      </div>
+    </div>
+    
+    <button onclick="addBookmark()" class="add-bookmark">Add Current Page to Bookmarks</button>
+  </div>
+
+  <script>
+    function navigateToUrl(url) {
+      if (window.navigateFromNova) {
+        window.navigateFromNova(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    function addBookmark() {
+      const title = prompt('Enter bookmark title:');
+      const url = prompt('Enter bookmark URL:');
+      
+      if (title && url) {
+        // Create new bookmark item
+        const bookmarkItem = document.createElement('div');
+        bookmarkItem.className = 'bookmark-item';
+        bookmarkItem.onclick = () => navigateToUrl(url);
+        
+        bookmarkItem.innerHTML = `
+          <div class="bookmark-favicon">🔖</div>
+          <div class="bookmark-title">${title}</div>
+          <div class="bookmark-url">${url}</div>
+        `;
+        
+        // Add to favorites folder
+        const favoritesFolder = document.querySelector('.bookmark-folder');
+        favoritesFolder.appendChild(bookmarkItem);
+        
+        alert('Bookmark added successfully!');
+      }
+    }
+
+    // Make back link functional
+    document.querySelector('.back-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      navigateToUrl('nova://home');
+    });
+  </script>
+</body>
+</html>

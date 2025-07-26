@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Nova Browser</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 40px; background: #222; color: white; }
+    .container { max-width: 600px; margin: 0 auto; text-align: center; }
+    .logo { font-size: 4em; margin-bottom: 20px; }
+    h1 { color: #667eea; }
+    .version { background: #333; padding: 10px 20px; border-radius: 20px; display: inline-block; margin: 20px 0; }
+    .back-link { position: absolute; top: 20px; left: 20px; color: #667eea; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; text-align: left; }
+    .info-item { background: #333; padding: 15px; border-radius: 8px; }
+    .info-label { color: #888; font-size: 0.9em; }
+    .info-value { font-weight: bold; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <a href="nova://home" class="back-link">← Back to Home</a>
+  <div class="container">
+    <div class="logo">🌟</div>
+    <h1>Nova Browser</h1>
+    <div class="version">Version 1.0.0</div>
+    <p>A modern, fast, and secure web browser built with Electron.</p>
+    <p>Created with ❤️ by the Nova team.</p>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Engine</div>
+        <div class="info-value">Chromium</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Framework</div>
+        <div class="info-value">Electron</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Release Date</div>
+        <div class="info-value">2025</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">License</div>
+        <div class="info-value">MIT</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function navigateToUrl(url) {
+      if (window.navigateFromNova) {
+        window.navigateFromNova(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    // Make back link functional
+    document.querySelector('.back-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      navigateToUrl('nova://home');
+    });
+  </script>
+</body>
+</html>

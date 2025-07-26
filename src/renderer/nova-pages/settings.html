@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Browser - Settings</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 40px; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); }
+    h1 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+    .setting-group { margin: 30px 0; }
+    .setting-group h3 { color: #555; margin-bottom: 15px; }
+    .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
+    .back-link { position: absolute; top: 20px; left: 20px; color: #667eea; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .form-control { padding: 5px; border: 1px solid #ddd; border-radius: 4px; }
+    .btn { border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    .btn-primary { background: #667eea; color: white; }
+    .btn-danger { background: #e74c3c; color: white; margin-left: 10px; }
+    .btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <a href="nova://home" class="back-link">← Back to Home</a>
+  <div class="container">
+    <h1>Nova Browser Settings</h1>
+    <div class="setting-group">
+      <h3>General</h3>
+      <div class="setting-item">
+        <label for="homepage">Home page</label>
+        <input type="text" id="homepage" value="nova://home" class="form-control">
+      </div>
+      <div class="setting-item">
+        <label for="search-engine">Search engine</label>
+        <select id="search-engine" class="form-control">
+          <option>Google</option>
+          <option>Bing</option>
+          <option>DuckDuckGo</option>
+        </select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <h3>Privacy</h3>
+      <div class="setting-item">
+        <label for="clear-data">Clear browsing data on exit</label>
+        <input type="checkbox" id="clear-data">
+      </div>
+    </div>
+    <div class="setting-group">
+      <h3>Appearance</h3>
+      <div class="setting-item">
+        <label for="dark-mode">Dark mode</label>
+        <input type="checkbox" id="dark-mode">
+      </div>
+      <div class="setting-item">
+        <label for="bookmarks-bar">Show bookmarks bar</label>
+        <input type="checkbox" id="bookmarks-bar" checked>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <button onclick="saveSettings()" class="btn btn-primary">Save Settings</button>
+      <button onclick="resetSettings()" class="btn btn-danger">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <script>
+    function navigateToUrl(url) {
+      if (window.navigateFromNova) {
+        window.navigateFromNova(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    function saveSettings() {
+      const settings = {
+        homepage: document.getElementById('homepage').value,
+        searchEngine: document.getElementById('search-engine').value,
+        clearData: document.getElementById('clear-data').checked,
+        darkMode: document.getElementById('dark-mode').checked,
+        bookmarksBar: document.getElementById('bookmarks-bar').checked
+      };
+      
+      // Store settings in localStorage
+      localStorage.setItem('novaSettings', JSON.stringify(settings));
+      
+      // Show confirmation
+      alert('Settings saved successfully!');
+      
+      // Apply dark mode immediately if changed
+      if (settings.darkMode) {
+        document.body.style.background = '#2c3e50';
+        document.body.style.color = '#ecf0f1';
+        document.querySelector('.container').style.background = '#34495e';
+      } else {
+        document.body.style.background = '#f5f5f5';
+        document.body.style.color = '#333';
+        document.querySelector('.container').style.background = 'white';
+      }
+    }
+
+    function resetSettings() {
+      if (confirm('Are you sure you want to reset all settings to defaults?')) {
+        document.getElementById('homepage').value = 'nova://home';
+        document.getElementById('search-engine').value = 'Google';
+        document.getElementById('clear-data').checked = false;
+        document.getElementById('dark-mode').checked = false;
+        document.getElementById('bookmarks-bar').checked = true;
+        
+        // Clear stored settings
+        localStorage.removeItem('novaSettings');
+        
+        alert('Settings reset to defaults!');
+      }
+    }
+
+    // Load settings on page load
+    function loadSettings() {
+      const saved = localStorage.getItem('novaSettings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        document.getElementById('homepage').value = settings.homepage || 'nova://home';
+        document.getElementById('search-engine').value = settings.searchEngine || 'Google';
+        document.getElementById('clear-data').checked = settings.clearData || false;
+        document.getElementById('dark-mode').checked = settings.darkMode || false;
+        document.getElementById('bookmarks-bar').checked = settings.bookmarksBar !== undefined ? settings.bookmarksBar : true;
+        
+        // Apply dark mode if enabled
+        if (settings.darkMode) {
+          document.body.style.background = '#2c3e50';
+          document.body.style.color = '#ecf0f1';
+          document.querySelector('.container').style.background = '#34495e';
+        }
+      }
+    }
+
+    // Make back link functional
+    document.querySelector('.back-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      navigateToUrl('nova://home');
+    });
+
+    // Load settings when page loads
+    loadSettings();
+  </script>
+</body>
+</html>
