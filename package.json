@@ -1,0 +1,46 @@
+{
+  "name": "nova-browser",
+  "version": "0.0.1",
+  "description": "Yet another electron-based browser, Nova browser is designed to be an all-in-one browser featuring modes, AI tab grouping, and more!",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lordseriouspig/Nova-Browser.git"
+  },
+  "keywords": [
+    "browser",
+    "electron",
+    "nova",
+    "tabs",
+    "ai",
+    "modes"
+  ],
+  "author": "Lordseriouspig",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Lordseriouspig/Nova-Browser/issues"
+  },
+  "homepage": "https://github.com/Lordseriouspig/Nova-Browser#readme",
+  "devDependencies": {
+    "electron": "^37.2.4"
+  },
+  "dependencies": {
+    "lucide": "^0.525.0"
+  },
+  "build": {
+  "appId": "com.novabrowser.app",
+  "productName": "Nova Browser",
+  "win": {
+    "icon": "assets/icon/icon-win.ico"
+  },
+  "mac": {
+    "icon": "assets/icon/icon-mac.icns"
+  },
+  "linux": {
+    "icon": "assets/icon/icon-linux.png"
+  }
+}
+}
