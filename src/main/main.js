@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -9,8 +9,8 @@ function createWindow() {
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, '../renderer/preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: true,
+      contextIsolation: false,
       webviewTag: true
     }
   });
@@ -19,6 +19,14 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
+
+// Handle window close request from renderer
+ipcMain.on('close-window', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) {
+    window.close();
+  }
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
