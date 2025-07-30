@@ -65,6 +65,23 @@
   </div>
 
   <script>
+    let NovaSettings;
+
+    // Debug what's available on window
+    console.log('Window objects after script load:', {
+      novaSettings: !!window.novaSettings,
+      novaAPI: !!window.novaAPI,
+      windowKeys: Object.keys(window).filter(k => k.includes('ova'))
+    });
+
+    // Use the contextBridge exposed novaSettings
+    if (window.novaSettings) {
+      NovaSettings = window.novaSettings;
+      console.log('Using contextBridge novaSettings, store type:', NovaSettings.getStoreType());
+    } else {
+      console.error('window.novaSettings not available - contextBridge may not be working');
+    }
+
     function navigateToUrl(url) {
       if (window.navigateFromNova) {
         window.navigateFromNova(url);
@@ -73,65 +90,142 @@
       }
     }
 
-    function saveSettings() {
-      const settings = {
-        homepage: document.getElementById('homepage').value,
-        searchEngine: document.getElementById('search-engine').value,
-        clearData: document.getElementById('clear-data').checked,
-        darkMode: document.getElementById('dark-mode').checked,
-        bookmarksBar: document.getElementById('bookmarks-bar').checked
-      };
-      
-      // Store settings in localStorage
-      localStorage.setItem('novaSettings', JSON.stringify(settings));
-      
-      // Show confirmation
-      alert('Settings saved successfully!');
-      
-      // Apply dark mode immediately if changed
-      if (settings.darkMode) {
-        document.body.style.background = '#2c3e50';
-        document.body.style.color = '#ecf0f1';
-        document.querySelector('.container').style.background = '#34495e';
-      } else {
-        document.body.style.background = '#f5f5f5';
-        document.body.style.color = '#333';
-        document.querySelector('.container').style.background = 'white';
+    async function saveSettings() {
+      if (!NovaSettings) {
+        alert('Settings system not ready. Please try again.');
+        return;
+      }
+
+      try {
+        const settingsToSave = {
+          'homepage': document.getElementById('homepage').value,
+          'search-engine': document.getElementById('search-engine').value,
+          'clear-data': document.getElementById('clear-data').checked,
+          'dark-mode': document.getElementById('dark-mode').checked,
+          'bookmarks-bar': document.getElementById('bookmarks-bar').checked
+        };
+        
+        // Save all settings (async)
+        const result = await NovaSettings.setMultiple(settingsToSave);
+        
+        if (result) {
+          // Show confirmation
+          alert('Settings saved successfully!');
+          
+          // Apply dark mode immediately if changed
+          await applyTheme();
+        } else {
+          alert('Failed to save settings. Please try again.');
+        }
+        
+      } catch (error) {
+        console.error('Error saving settings:', error);
+        alert('Failed to save settings. Please try again.');
       }
     }
 
-    function resetSettings() {
+    async function resetSettings() {
+      if (!NovaSettings) {
+        alert('Settings system not ready. Please try again.');
+        return;
+      }
+
       if (confirm('Are you sure you want to reset all settings to defaults?')) {
+        try {
+          const result = await NovaSettings.resetAll();
+          if (result) {
+            await loadSettings(); // Reload the form
+            alert('Settings reset to defaults!');
+          } else {
+            alert('Failed to reset settings. Please try again.');
+          }
+        } catch (error) {
+          console.error('Error resetting settings:', error);
+          alert('Failed to reset settings. Please try again.');
+        }
+      }
+    }
+
+    async function loadSettings() {
+      if (!NovaSettings) {
+        console.log('Settings system not ready, trying again...');
+        setTimeout(loadSettings, 100);
+        return;
+      }
+
+      try {
+        console.log('Loading settings with store type:', NovaSettings.getStoreType());
+        
+        // Load individual settings (async)
+        document.getElementById('homepage').value = await NovaSettings.get('homepage', 'nova://home');
+        document.getElementById('search-engine').value = await NovaSettings.get('search-engine', 'Google');
+        document.getElementById('clear-data').checked = await NovaSettings.get('clear-data', false);
+        document.getElementById('dark-mode').checked = await NovaSettings.get('dark-mode', false);
+        document.getElementById('bookmarks-bar').checked = await NovaSettings.get('bookmarks-bar', true);
+        
+        console.log('Settings loaded successfully');
+        
+        // Apply current theme
+        await applyTheme();
+        
+      } catch (error) {
+        console.error('Error loading settings:', error);
+        // Fall back to defaults if loading fails
         document.getElementById('homepage').value = 'nova://home';
         document.getElementById('search-engine').value = 'Google';
         document.getElementById('clear-data').checked = false;
         document.getElementById('dark-mode').checked = false;
         document.getElementById('bookmarks-bar').checked = true;
-        
-        // Clear stored settings
-        localStorage.removeItem('novaSettings');
-        
-        alert('Settings reset to defaults!');
+        console.log('Loaded default settings due to error');
       }
     }
 
-    // Load settings on page load
-    function loadSettings() {
-      const saved = localStorage.getItem('novaSettings');
-      if (saved) {
-        const settings = JSON.parse(saved);
-        document.getElementById('homepage').value = settings.homepage || 'nova://home';
-        document.getElementById('search-engine').value = settings.searchEngine || 'Google';
-        document.getElementById('clear-data').checked = settings.clearData || false;
-        document.getElementById('dark-mode').checked = settings.darkMode || false;
-        document.getElementById('bookmarks-bar').checked = settings.bookmarksBar !== undefined ? settings.bookmarksBar : true;
+    async function applyTheme() {
+      if (!NovaSettings) return;
+      
+      try {
+        const darkMode = await NovaSettings.get('dark-mode', false);
         
-        // Apply dark mode if enabled
-        if (settings.darkMode) {
+        if (darkMode) {
           document.body.style.background = '#2c3e50';
           document.body.style.color = '#ecf0f1';
           document.querySelector('.container').style.background = '#34495e';
+        } else {
+          document.body.style.background = '#f5f5f5';
+          document.body.style.color = '#333';
+          document.querySelector('.container').style.background = 'white';
         }
+      } catch (error) {
+        console.error('Error applying theme:', error);
+      }
+    }
+
+    // Initialize settings system
+    async function initializeSettings() {
+      try {
+        if (!NovaSettings) {
+          console.error('Settings system not available - contextBridge may not be working');
+          alert('Settings system failed to load. Some features may not work properly.');
+          // Set defaults
+          setTimeout(() => {
+            document.getElementById('homepage').value = 'nova://home';
+            document.getElementById('search-engine').value = 'Google';
+            document.getElementById('clear-data').checked = false;
+            document.getElementById('dark-mode').checked = false;
+            document.getElementById('bookmarks-bar').checked = true;
+          }, 100);
+          return;
+        }
+        
+        console.log('Settings system initialized:', NovaSettings.getStoreType());
+        console.log('Settings ready:', NovaSettings.ready());
+        
+        // Load settings once initialized
+        await loadSettings();
+        
+      } catch (error) {
+        console.error('Failed to initialize settings:', error);
+        alert('Settings system failed to load. Some features may not work properly.');
       }
     }
 
@@ -141,8 +235,8 @@
       navigateToUrl('nova://home');
     });
 
-    // Load settings when page loads
-    loadSettings();
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', initializeSettings);
   </script>
 </body>
 </html>

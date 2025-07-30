@@ -28,6 +28,7 @@
     "electron": "^37.2.4"
   },
   "dependencies": {
+    "electron-store": "^8.0.0"
   },
   "build": {
   "appId": "com.novabrowser.app",

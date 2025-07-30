@@ -1,5 +1,73 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// Initialize electron-store in main process for IPC communication
+const Store = require('electron-store');
+const settingsStore = new Store({
+  name: 'nova-settings',
+  defaults: {
+    'homepage': 'nova://home',
+    'search-engine': 'Google',
+    'startup-behavior': 'homepage',
+    'clear-data': false,
+    'block-trackers': true,
+    'accept-cookies': 'all',
+    'dark-mode': false,
+    'bookmarks-bar': true,
+    'tab-position': 'top',
+    'zoom-level': 100,
+    'hardware-acceleration': true,
+    'developer-tools': true,
+    'auto-updates': true
+  }
+});
+
+// IPC handler for settings requests from main window preload
+ipcMain.on('settings-request', (event, request) => {
+  const { requestId, action, ...data } = request;
+  let success = true;
+  let result, error;
+  
+  try {
+    switch (action) {
+      case 'get':
+        result = settingsStore.get(data.key, data.defaultValue);
+        break;
+      case 'set':
+        settingsStore.set(data.key, data.value);
+        result = true;
+        break;
+      case 'getAll':
+        result = settingsStore.store;
+        break;
+      case 'setMultiple':
+        for (const [key, value] of Object.entries(data.settings)) {
+          settingsStore.set(key, value);
+        }
+        result = true;
+        break;
+      case 'remove':
+        settingsStore.delete(data.key);
+        result = true;
+        break;
+      case 'clear':
+        settingsStore.clear();
+        result = true;
+        break;
+      case 'has':
+        result = settingsStore.has(data.key);
+        break;
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+  } catch (err) {
+    success = false;
+    error = err.message;
+  }
+  
+  event.reply('settings-response', { requestId, success, data: result, error });
+});
 
 // Register as default protocol handler for nova://
 if (process.defaultApp) {
@@ -9,6 +77,8 @@ if (process.defaultApp) {
 } else {
   app.setAsDefaultProtocolClient('nova');
 }
+
+// This duplicate registration is removed - protocol registration happens in the main app.whenReady() below
 
 // Prevent multiple instances - always use existing window
 const gotTheLock = app.requestSingleInstanceLock();
@@ -55,7 +125,61 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    // Register protocol first, then create window
+    protocol.registerStringProtocol('nova', (request, callback) => {
+      const url = new URL(request.url);
+      const page = url.hostname + url.pathname.replace(/^\//, '');
+      console.log('[Nova Protocol] Handling nova:// request for page:', page);
+      
+      try {
+        const novaPagePath = path.join(__dirname, '../renderer/nova-pages', `${page}.html`);
+        console.log('[Nova Protocol] Looking for page at:', novaPagePath);
+        
+        if (fs.existsSync(novaPagePath)) {
+          let htmlContent = fs.readFileSync(novaPagePath, 'utf8');
+          
+          // Replace placeholders
+          htmlContent = htmlContent
+            .replace(/\{\{PAGE\}\}/g, page)
+            .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
+            .replace(/\{\{VERSION\}\}/g, '1.0.0');
+          
+          console.log('[Nova Protocol] ✅ Successfully loaded nova:// page:', page);
+          callback({ data: htmlContent, mimeType: 'text/html' });
+        } else {
+          // Load 404 page
+          const notFoundPath = path.join(__dirname, '../renderer/nova-pages', '404.html');
+          if (fs.existsSync(notFoundPath)) {
+            let htmlContent = fs.readFileSync(notFoundPath, 'utf8');
+            htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, page);
+            console.log('[Nova Protocol] 📄 Loaded 404 page for:', page);
+            callback({ data: htmlContent, mimeType: 'text/html' });
+          } else {
+            // Fallback 404
+            const fallback404 = `
+              <!DOCTYPE html>
+              <html>
+              <head><title>Not Found - Nova Browser</title></head>
+              <body>
+                <h1>Page Not Found</h1>
+                <p>Could not load nova://${page}</p>
+                <p><a href="nova://home">Go to Nova Home</a></p>
+              </body>
+              </html>
+            `;
+            console.log('[Nova Protocol] 🔄 Using fallback 404 for:', page);
+            callback({ data: fallback404, mimeType: 'text/html' });
+          }
+        }
+      } catch (error) {
+        console.error('[Nova Protocol] ❌ Error handling nova:// request:', error);
+        callback({ error: error.code || -6 });
+      }
+    });
+    
+    createWindow();
+  });
 }
 
 function createWindow() {
@@ -66,13 +190,18 @@ function createWindow() {
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, '../renderer/preload.js'),
-      nodeIntegration: true,
-      contextIsolation: false,
-      webviewTag: true
+      nodeIntegration: false,       // Secure: no Node.js in renderer
+      contextIsolation: true,       // Secure: isolated contexts
+      webviewTag: true,             // Enable webview for website content
+      enableRemoteModule: false,     // Additional security
+      sandbox: false
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+
+  // Open DevTools for debugging (remove this in production)
+  mainWindow.webContents.openDevTools();
 
   // Handle nova:// URL if app was launched with one
   const novaUrl = process.argv.find(arg => arg.startsWith('nova://'));
