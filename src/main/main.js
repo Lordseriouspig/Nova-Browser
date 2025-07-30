@@ -258,3 +258,27 @@ ipcMain.on('close-window', (event) => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+// Handle clearing browsing data on exit
+app.on('before-quit', async (event) => {
+  try {
+    // Check if clear data on exit is enabled
+    const clearDataOnExit = await settingsStore.get('clear-data', false);
+    if (clearDataOnExit) {
+      console.log('[Nova Main] Clearing browsing data on exit...');
+      
+      // Clear session data
+      const session = require('electron').session.defaultSession;
+      
+      // Clear cache, cookies, and storage data
+      await session.clearCache();
+      await session.clearStorageData({
+        storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers']
+      });
+      
+      console.log('[Nova Main] ✅ Browsing data cleared successfully');
+    }
+  } catch (error) {
+    console.error('[Nova Main] ❌ Error clearing browsing data:', error);
+  }
+});

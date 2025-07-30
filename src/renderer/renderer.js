@@ -102,6 +102,23 @@ document.addEventListener('DOMContentLoaded', () => {
     return document.querySelector('.tab-view.active');
   }
 
+  // Update URL input from webview's current URL
+  function updateUrlFromWebview(webview) {
+    if (webview && webview.classList.contains('active')) {
+      // Check if this is a nova page
+      if (webview.dataset.novaUrl) {
+        urlInput.value = webview.dataset.novaUrl;
+      } else {
+        try {
+          const currentUrl = webview.getURL();
+          urlInput.value = currentUrl;
+        } catch (error) {
+          console.log('Could not get webview URL:', error);
+        }
+      }
+    }
+  }
+
   // Initialize the first tab click handler and add close button
   const firstTab = document.querySelector('.tab[data-id="tab-0"]');
   if (firstTab) {
@@ -147,6 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview && activeWebview.canGoBack()) {
       activeWebview.goBack();
+      
+      // Force URL update after navigation
+      setTimeout(() => {
+        updateUrlFromWebview(activeWebview);
+      }, 100);
     }
   });
 
@@ -154,6 +176,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview && activeWebview.canGoForward()) {
       activeWebview.goForward();
+      
+      // Force URL update after navigation  
+      setTimeout(() => {
+        updateUrlFromWebview(activeWebview);
+      }, 100);
     }
   });
 
@@ -315,9 +342,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Generate home page content for new tabs
-  function generateHomePage() {
-    // With nova:// protocol, we don't need to load files directly
-    // The protocol handler in main process will handle nova://home
+  async function generateHomePage() {
+    // Get the homepage from settings
+    try {
+      if (window.novaSettings) {
+        const homepage = await window.novaSettings.get('homepage', 'nova://home');
+        return homepage;
+      }
+    } catch (error) {
+      console.log('Could not get homepage from settings, using default:', error);
+    }
+    
+    // Fallback to default
     return 'nova://home';
   }
 
@@ -547,25 +583,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Setup events for the initial webview
-  const initialWebview = document.querySelector('.tab-view[data-id="tab-0"]');
-  if (initialWebview) {
-    // Set correct preload path for initial webview BEFORE setting src
-    const preloadPath = './preload.js'; // Relative path works for webviews
-    console.log('[Nova Renderer] Setting preload path for initial webview:', preloadPath);
-    initialWebview.setAttribute('preload', preloadPath);
-    
-    // Now set the src after preload is configured
-    initialWebview.src = 'nova://home';
-    
-    setupWebviewListener(initialWebview);
-    setupWebviewEvents(initialWebview);
-    // Set initial URL in the input
-    urlInput.value = 'nova://home';
+  // Setup events for the initial webview - use async initialization
+  async function initializeFirstTab() {
+    const initialWebview = document.querySelector('.tab-view[data-id="tab-0"]');
+    if (initialWebview) {
+      // Set correct preload path for initial webview BEFORE setting src
+      const preloadPath = './preload.js'; // Relative path works for webviews
+      console.log('[Nova Renderer] Setting preload path for initial webview:', preloadPath);
+      initialWebview.setAttribute('preload', preloadPath);
+      
+      // Get homepage from settings and set it
+      const homepageUrl = await generateHomePage();
+      initialWebview.src = homepageUrl;
+      
+      setupWebviewListener(initialWebview);
+      setupWebviewEvents(initialWebview);
+      // Set initial URL in the input
+      urlInput.value = homepageUrl;
+    }
   }
 
+  // Initialize the first tab
+  initializeFirstTab();
+
   // New tab creation
-  newTabBtn.addEventListener('click', () => {
+  newTabBtn.addEventListener('click', async () => {
     const tabId = `tab-${tabCount++}`;
 
     // Create tab button
@@ -576,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create webview
     const webview = document.createElement('webview');
-    webview.src = generateHomePage(); // This now returns 'nova://home'
+    webview.src = await generateHomePage(); // Now properly awaited
     webview.className = 'tab-view';
     webview.dataset.id = tabId;
     const preloadPath = './preload.js'; // Relative path works for webviews

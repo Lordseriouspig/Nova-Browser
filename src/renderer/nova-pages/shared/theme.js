@@ -20,59 +20,29 @@ class NovaTheme {
         this.applyTheme(e.newValue);
       }
     });
-    
-    // Listen for system theme changes
-    if (window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      mediaQuery.addEventListener('change', (e) => {
-        // Only auto-switch if user hasn't set a manual preference
-        const savedTheme = localStorage.getItem('nova-theme');
-        if (!savedTheme) {
-          const systemPrefersDark = e.matches;
-          const newTheme = systemPrefersDark ? 'dark' : 'light';
-          
-          this.applyTheme(newTheme);
-          
-          // Update Nova settings
-          if (window.novaSettings) {
-            try {
-              window.novaSettings.set('dark-mode', systemPrefersDark);
-            } catch (error) {
-              console.log('Could not save system theme change to Nova settings:', error);
-            }
-          }
-          
-          console.log('System theme changed to:', newTheme);
-        }
-      });
-    }
   }
 
-  // Apply theme from localStorage or system preference
+  // Apply theme from localStorage or Nova settings
   async applyStoredTheme() {
     const savedTheme = localStorage.getItem('nova-theme');
     
-    let themeToApply = 'light';
+    let themeToApply = 'light'; // Default to light theme
     
     if (savedTheme) {
       // Use saved preference
       themeToApply = savedTheme;
     } else {
-      // Check system preference
-      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      themeToApply = systemPrefersDark ? 'dark' : 'light';
-      
       // Try to get from Nova settings as fallback
       if (window.novaSettings) {
         try {
-          const darkMode = await window.novaSettings.get('dark-mode', systemPrefersDark);
+          const darkMode = await window.novaSettings.get('dark-mode', false);
           themeToApply = darkMode ? 'dark' : 'light';
         } catch (error) {
-          console.log('Could not get theme from Nova settings, using system preference:', error);
+          console.log('Could not get theme from Nova settings, using default light theme:', error);
         }
       }
       
-      console.log('No stored theme preference, using system preference:', themeToApply);
+      console.log('No stored theme preference, using default light theme');
     }
     
     this.applyTheme(themeToApply);
@@ -179,28 +149,25 @@ class NovaTheme {
     return theme;
   }
 
-  // Reset to system preference
-  async resetToSystemTheme() {
-    // Remove stored preference to allow system theme detection
+  // Reset to default light theme
+  async resetToDefaultTheme() {
+    // Remove stored preference to use default light theme
     localStorage.removeItem('nova-theme');
     
-    // Detect and apply system preference
-    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const systemTheme = systemPrefersDark ? 'dark' : 'light';
-    
-    this.applyTheme(systemTheme);
+    // Apply light theme
+    this.applyTheme('light');
     
     // Update settings
     if (window.novaSettings) {
       try {
-        await window.novaSettings.set('dark-mode', systemPrefersDark);
+        await window.novaSettings.set('dark-mode', false);
       } catch (error) {
-        console.error('Failed to save system theme to settings:', error);
+        console.error('Failed to save default theme to settings:', error);
       }
     }
     
-    console.log('Reset to system theme:', systemTheme);
-    return systemTheme;
+    console.log('Reset to default light theme');
+    return 'light';
   }
 
   // Load theme from Nova settings
@@ -232,19 +199,19 @@ window.toggleTheme = () => {
 };
 window.setTheme = (theme) => window.NovaTheme.setTheme(theme);
 window.getCurrentTheme = () => window.NovaTheme.getCurrentTheme();
-window.resetToSystemTheme = () => window.NovaTheme.resetToSystemTheme();
+window.resetToDefaultTheme = () => window.NovaTheme.resetToDefaultTheme();
 
 console.log('Nova Theme system loaded. Available functions:', {
   toggleTheme: typeof window.toggleTheme,
   setTheme: typeof window.setTheme,
   getCurrentTheme: typeof window.getCurrentTheme,
-  resetToSystemTheme: typeof window.resetToSystemTheme
+  resetToDefaultTheme: typeof window.resetToDefaultTheme
 });
 
 // Dispatch event when theme system is ready
 window.dispatchEvent(new CustomEvent('nova-theme-ready', {
   detail: { 
     theme: window.NovaTheme.getCurrentTheme(),
-    functions: ['toggleTheme', 'setTheme', 'getCurrentTheme', 'resetToSystemTheme']
+    functions: ['toggleTheme', 'setTheme', 'getCurrentTheme', 'resetToDefaultTheme']
   }
 }));
