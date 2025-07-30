@@ -13,13 +13,11 @@ const settingsStore = new Store({
     'clear-data': false,
     'block-trackers': true,
     'accept-cookies': 'all',
-    'dark-mode': false,
+    'dark-mode': true,
     'bookmarks-bar': true,
-    'tab-position': 'top',
     'zoom-level': 100,
     'hardware-acceleration': true,
     'developer-tools': true,
-    'auto-updates': true
   }
 });
 
@@ -129,10 +127,47 @@ if (!gotTheLock) {
     // Register protocol first, then create window
     protocol.registerStringProtocol('nova', (request, callback) => {
       const url = new URL(request.url);
-      const page = url.hostname + url.pathname.replace(/^\//, '');
+      console.log('[Nova Protocol] Full URL:', request.url);
+      console.log('[Nova Protocol] Parsed - hostname:', url.hostname, 'pathname:', url.pathname);
+      
+      // For nova://shared/theme.css, hostname="shared" and pathname="/theme.css"
+      // We need to combine them properly
+      let page;
+      if (url.hostname && url.pathname && url.pathname !== '/') {
+        page = url.hostname + url.pathname; // "shared/theme.css"
+      } else {
+        page = url.hostname; // Just "home" for nova://home
+      }
+      
       console.log('[Nova Protocol] Handling nova:// request for page:', page);
       
       try {
+        // Check if it's a CSS or JS file
+        if (page.endsWith('.css')) {
+          const cssPath = path.join(__dirname, '../renderer/nova-pages', page);
+          console.log('[Nova Protocol] Looking for CSS at:', cssPath);
+          
+          if (fs.existsSync(cssPath)) {
+            const cssContent = fs.readFileSync(cssPath, 'utf8');
+            console.log('[Nova Protocol] ✅ Successfully loaded CSS:', page);
+            callback({ data: cssContent, mimeType: 'text/css' });
+            return;
+          }
+        }
+        
+        if (page.endsWith('.js')) {
+          const jsPath = path.join(__dirname, '../renderer/nova-pages', page);
+          console.log('[Nova Protocol] Looking for JS at:', jsPath);
+          
+          if (fs.existsSync(jsPath)) {
+            const jsContent = fs.readFileSync(jsPath, 'utf8');
+            console.log('[Nova Protocol] ✅ Successfully loaded JS:', page);
+            callback({ data: jsContent, mimeType: 'application/javascript' });
+            return;
+          }
+        }
+        
+        // Handle HTML pages
         const novaPagePath = path.join(__dirname, '../renderer/nova-pages', `${page}.html`);
         console.log('[Nova Protocol] Looking for page at:', novaPagePath);
         

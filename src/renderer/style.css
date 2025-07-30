@@ -1,27 +1,96 @@
+/* Nova Browser Main UI Styles with Theme Support */
+:root {
+  /* Additional variables for main UI */
+  --toolbar-bg: #2b2b2b;
+  --toolbar-bg-light: #f0f0f0;
+  --input-bg: #1a1a1a;
+  --input-bg-light: #ffffff;
+  --input-border: #555555;
+  --input-border-light: #cccccc;
+  --input-focus: #0078d4;
+  --button-bg: #444444;
+  --button-bg-light: #e0e0e0;
+  --button-hover: #666666;
+  --button-hover-light: #d0d0d0;
+  --tab-bg: #222222;
+  --tab-bg-light: #f8f8f8;
+  --tab-item-bg: #333333;
+  --tab-item-bg-light: #ffffff;
+  --tab-active-bg: #555555;
+  --tab-active-bg-light: #e0e0e0;
+  --new-tab-bg: #2a2a2a;
+  --new-tab-bg-light: #f0f0f0;
+  --new-tab-hover: #3a3a3a;
+  --new-tab-hover-light: #e8e8e8;
+}
+
+[data-theme="dark"] {
+  --toolbar-bg: #2b2b2b;
+  --input-bg: #1a1a1a;
+  --input-border: #555555;
+  --button-bg: #444444;
+  --button-hover: #666666;
+  --tab-bg: #222222;
+  --tab-item-bg: #333333;
+  --tab-active-bg: #555555;
+  --new-tab-bg: #2a2a2a;
+  --new-tab-hover: #3a3a3a;
+}
+
+[data-theme="light"] {
+  --toolbar-bg: var(--toolbar-bg-light);
+  --input-bg: var(--input-bg-light);
+  --input-border: var(--input-border-light);
+  --button-bg: var(--button-bg-light);
+  --button-hover: var(--button-hover-light);
+  --tab-bg: var(--tab-bg-light);
+  --tab-item-bg: var(--tab-item-bg-light);
+  --tab-active-bg: var(--tab-active-bg-light);
+  --new-tab-bg: var(--new-tab-bg-light);
+  --new-tab-hover: var(--new-tab-hover-light);
+}
+
+/* Apply light theme when no data-theme attribute is set but theme is light */
+html:not([data-theme="dark"]) {
+  --toolbar-bg: var(--toolbar-bg-light);
+  --input-bg: var(--input-bg-light);
+  --input-border: var(--input-border-light);
+  --button-bg: var(--button-bg-light);
+  --button-hover: var(--button-hover-light);
+  --tab-bg: var(--tab-bg-light);
+  --tab-item-bg: var(--tab-item-bg-light);
+  --tab-active-bg: var(--tab-active-bg-light);
+  --new-tab-bg: var(--new-tab-bg-light);
+  --new-tab-hover: var(--new-tab-hover-light);
+}
+
 body {
   margin: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 #toolbar {
   display: flex;
   gap: 8px;
   padding: 8px;
-  background-color: #2b2b2b;
-  color: white;
+  background-color: var(--toolbar-bg);
+  color: var(--text-primary);
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
 }
 
 #toolbar input {
   flex: 1;
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid #555;
-  background: #1a1a1a;
-  color: #fff;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
   outline: none;
@@ -30,32 +99,33 @@ body {
 }
 
 #toolbar input:focus {
-  border-color: #0078d4;
-  background: #000;
-  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.3);
+  border-color: var(--input-focus);
+  background: var(--input-bg);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
 }
 
 #toolbar input::placeholder {
-  color: #888;
+  color: var(--text-muted);
   font-style: italic;
 }
 
 #toolbar input:hover:not(:focus) {
-  border-color: #666;
-  background: #0f0f0f;
+  border-color: var(--border-color);
+  background: var(--input-bg);
 }
 
 #toolbar button {
   padding: 6px 10px;
   border: none;
-  background: #444;
-  color: white;
+  background: var(--button-bg);
+  color: var(--text-primary);
   border-radius: 4px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 #toolbar button:hover {
-  background: #666;
+  background: var(--button-hover);
 }
 
 #reload svg {
@@ -82,24 +152,33 @@ webview {
 
 #tabs {
   display: flex;
-  background: #222;
+  background: var(--tab-bg);
   padding: 4px;
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .tab {
-  background: #333;
-  color: white;
+  background: var(--tab-item-bg);
+  color: var(--text-primary);
   border: none;
   margin-right: 4px;
   padding: 6px 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .tab.active {
-  background: #555;
+  background: var(--tab-active-bg);
+  border-color: var(--accent-color);
+}
+
+.tab:hover:not(.active) {
+  background: var(--button-hover);
 }
 
 .tab-close {
@@ -107,16 +186,18 @@ webview {
   font-weight: bold;
   padding: 0 4px;
   border-radius: 2px;
+  transition: all 0.2s ease;
 }
 
 .tab-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff6b6b;
 }
 
 #new-tab-btn {
-  background: #2a2a2a;
-  color: #ccc;
-  border: none;
+  background: var(--new-tab-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
   padding: 6px 8px;
   margin-left: 4px;
   border-radius: 4px;
@@ -125,20 +206,19 @@ webview {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
   flex-shrink: 0;
 }
 
 #new-tab-btn:hover {
-  background: #3a3a3a;
-  color: white;
-  border-color: #555;
+  background: var(--new-tab-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
   transform: scale(1.05);
 }
 
 #new-tab-btn:active {
   transform: scale(0.95);
-  background: #1a1a1a;
+  background: var(--button-bg);
 }
 
 #new-tab-btn svg {

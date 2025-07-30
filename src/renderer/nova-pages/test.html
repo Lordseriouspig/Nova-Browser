@@ -4,27 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova Test - Context Bridge Test</title>
+    <link rel="stylesheet" href="nova://shared/theme.css">
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background: #f0f8ff;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         .test-box {
-            background: white;
+            background: var(--bg-secondary);
             padding: 20px;
             margin: 10px 0;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-light);
         }
         .success { border-left: 4px solid #28a745; }
         .error { border-left: 4px solid #dc3545; }
-        .info { border-left: 4px solid #17a2b8; }
+        .info { border-left: 4px solid var(--accent-color); }
         button {
-            background: #007bff;
-            color: white;
+            background: var(--accent-color);
+            color: var(--text-on-accent);
             border: none;
             padding: 8px 16px;
             border-radius: 4px;
@@ -72,7 +76,13 @@
         <pre id="log"></pre>
     </div>
 
+    <script src="nova://shared/theme.js"></script>
     <script>
+        // Test page - theme handled automatically by shared system
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Test page loaded - theme handled by shared system');
+        });
+
         function log(message) {
             const timestamp = new Date().toLocaleTimeString();
             const logEl = document.getElementById('log');

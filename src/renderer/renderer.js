@@ -655,4 +655,60 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
+  // Initialize theme system
+  initializeThemeSystem();
 });
+
+// Theme system initialization
+function initializeThemeSystem() {
+  console.log('[Nova Renderer] Initializing theme system...');
+  
+  // Load theme from settings and apply to main window
+  loadThemeFromSettings();
+  
+  // Listen for theme changes from Nova pages
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'nova-theme') {
+      applyThemeToMainWindow(e.newValue);
+    }
+  });
+  
+  // Listen for theme changes from webviews via postMessage
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'nova-theme-changed') {
+      applyThemeToMainWindow(event.data.theme);
+      localStorage.setItem('nova-theme', event.data.theme);
+    }
+  });
+}
+
+async function loadThemeFromSettings() {
+  try {
+    const novaSettings = window.novaAPI?.settings;
+    if (novaSettings) {
+      const darkMode = await novaSettings.get('dark-mode', false);
+      const theme = darkMode ? 'dark' : 'light';
+      applyThemeToMainWindow(theme);
+      localStorage.setItem('nova-theme', theme);
+      console.log('[Nova Renderer] Theme loaded from settings:', theme);
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to load theme from settings:', error);
+    // Fallback to localStorage
+    const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+    applyThemeToMainWindow(savedTheme);
+  }
+}
+
+function applyThemeToMainWindow(theme) {
+  const html = document.documentElement;
+  
+  if (theme === 'dark') {
+    html.setAttribute('data-theme', 'dark');
+  } else {
+    html.setAttribute('data-theme', 'light');
+  }
+  
+  console.log('[Nova Renderer] Applied theme to main window:', theme);
+}
