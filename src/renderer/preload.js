@@ -201,21 +201,21 @@ contextBridge.exposeInMainWorld('novaAPI', {
   // IPC API
   ipc: {
     send: (channel, ...args) => {
-      const validChannels = ['close-window', 'open-nova-url'];
+      const validChannels = ['close-window', 'open-nova-url', 'refresh-bookmarks-bar'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, ...args);
       }
     },
     
     on: (channel, callback) => {
-      const validChannels = ['open-nova-url'];
+      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, callback);
       }
     },
     
     removeAllListeners: (channel) => {
-      const validChannels = ['open-nova-url'];
+      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar'];
       if (validChannels.includes(channel)) {
         ipcRenderer.removeAllListeners(channel);
       }

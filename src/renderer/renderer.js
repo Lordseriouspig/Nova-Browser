@@ -20,6 +20,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('url').value = url;
       }
     });
+    
+    // Setup IPC listener for refreshing bookmarks bar
+    window.novaAPI.ipc.on('refresh-bookmarks-bar', async () => {
+      console.log('[Nova Renderer] Received refresh-bookmarks-bar request');
+      if (typeof loadBookmarksBar === 'function') {
+        try {
+          await loadBookmarksBar();
+          console.log('[Nova Renderer] Bookmarks bar refreshed successfully');
+        } catch (error) {
+          console.error('[Nova Renderer] Failed to refresh bookmarks bar:', error);
+        }
+      } else {
+        console.warn('[Nova Renderer] loadBookmarksBar function not available');
+      }
+    });
   }
 
   // Setup IPC listener for settings
@@ -83,6 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const devToolsBtn = document.getElementById('devtools');
   const goBtn = document.getElementById('go');
   const urlInput = document.getElementById('url');
+  const bookmarkBtn = document.getElementById('bookmark-btn');
+  const bookmarksBar = document.getElementById('bookmarks-bar');
 
   let tabCount = 1;
 
@@ -198,6 +215,16 @@ document.addEventListener('DOMContentLoaded', () => {
       reloadBtn.classList.add('loading');
       
       activeWebview.reload();
+    }
+  });
+
+  // Bookmark button functionality
+  bookmarkBtn.addEventListener('click', async () => {
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      const currentUrl = urlInput.value;
+      const title = await getPageTitle(activeWebview);
+      await addBookmark(currentUrl, title);
     }
   });
 
@@ -343,6 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           urlInput.value = event.url;
         }
+        // Update bookmark button state for new URL
+        updateBookmarkButtonState(event.url);
       }
     });
 
@@ -353,6 +382,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           urlInput.value = event.url;
         }
+        // Update bookmark button state for new URL
+        updateBookmarkButtonState(event.url);
       }
     });
 
@@ -573,11 +604,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const activeWebview = getActiveWebview();
     if (activeWebview) {
+      let currentUrl;
       if (activeWebview.dataset.novaUrl) {
-        urlInput.value = activeWebview.dataset.novaUrl;
+        currentUrl = activeWebview.dataset.novaUrl;
+        urlInput.value = currentUrl;
       } else {
-        urlInput.value = activeWebview.src;
+        currentUrl = activeWebview.src;
+        urlInput.value = currentUrl;
       }
+      // Update bookmark button state for the active tab
+      updateBookmarkButtonState(currentUrl);
     }
   }
 
@@ -609,7 +645,563 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Make functions available globally for bookmarks page
+  window.createBookmarkFolder = createBookmarkFolder;
+  window.getBookmarkFolders = getBookmarkFolders;
+  window.getBookmarksInFolder = getBookmarksInFolder;
+  window.moveBookmarkToFolder = moveBookmarkToFolder;
+
+  // Theme and bookmarks systems
   initializeThemeSystem();
+  initializeBookmarksSystem();
+  updateBookmarksBarVisibility();
+
+  // Bookmark management functions
+  async function getPageTitle(webview) {
+    try {
+      return await webview.executeJavaScript('document.title') || 'Untitled';
+    } catch (error) {
+      console.warn('Could not get page title:', error);
+      return 'Untitled';
+    }
+  }
+
+  async function addBookmark(url, title) {
+    try {
+      const bookmarks = await novaSettings.get('bookmarks', []);
+      
+      // Check if bookmark already exists
+      const existingIndex = bookmarks.findIndex(bookmark => bookmark.url === url);
+      if (existingIndex !== -1) {
+        // Remove existing bookmark
+        bookmarks.splice(existingIndex, 1);
+        await novaSettings.set('bookmarks', bookmarks);
+        
+        // Refresh bookmarks bar
+        await loadBookmarksBar();
+        
+        // Visual feedback for removal
+        bookmarkBtn.style.color = '#ff6b6b';
+        bookmarkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+        setTimeout(() => {
+          bookmarkBtn.style.color = '';
+          updateBookmarkButtonState(url);
+        }, 1000);
+        
+        console.debug('Bookmark removed:', url);
+        return;
+      }
+      
+      // Add new bookmark
+      const newBookmark = {
+        id: Date.now().toString(),
+        url: url,
+        title: title,
+        favicon: await getFavicon(url),
+        dateAdded: new Date().toISOString(),
+        folderId: null // Default to no folder
+      };
+      
+      bookmarks.push(newBookmark);
+      await novaSettings.set('bookmarks', bookmarks);
+      
+      // Refresh bookmarks bar
+      await loadBookmarksBar();
+      
+      // Visual feedback for addition
+      bookmarkBtn.style.color = '#ffd700';
+      bookmarkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+      setTimeout(() => {
+        bookmarkBtn.style.color = '';
+        updateBookmarkButtonState(url);
+      }, 1000);
+      
+      console.debug('Bookmark added:', newBookmark);
+    } catch (error) {
+      console.error('Failed to add/remove bookmark:', error);
+      alert('Failed to update bookmark');
+    }
+  }
+
+  // Update bookmark button appearance based on whether page is bookmarked
+  async function updateBookmarkButtonState(url) {
+    try {
+      const bookmarks = await novaSettings.get('bookmarks', []);
+      const isBookmarked = bookmarks.some(bookmark => bookmark.url === url);
+      
+      if (isBookmarked) {
+        // Filled bookmark icon for bookmarked pages
+        bookmarkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+        bookmarkBtn.title = 'Remove bookmark';
+      } else {
+        // Outline bookmark icon for non-bookmarked pages
+        bookmarkBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+        bookmarkBtn.title = 'Bookmark this page';
+      }
+    } catch (error) {
+      console.warn('Failed to update bookmark button state:', error);
+    }
+  }
+
+  // Default SVG icon for pages without favicons
+  function getDefaultFaviconSVG() {
+    const iconColor = getThemeIconColor();
+    return `data:image/svg+xml,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe-icon lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+    `)}`;
+  }
+
+  // Helper function to get theme-appropriate icon color
+  function getThemeIconColor() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    return theme === 'dark' ? '#ffffff' : '#000000';
+  }
+
+  async function getFavicon(url) {
+    try {
+      // Get the current theme color for SVG icons
+      const iconColor = getThemeIconColor();
+      
+      // For nova:// pages, use predefined icons as data URIs with theme-appropriate colors
+      if (url.includes('nova://settings')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        `)}`;
+      }
+      if (url.includes('nova://bookmarks')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+          </svg>
+        `)}`;
+      }
+      if (url.includes('nova://history')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M12 7v5l4 2"/>
+          </svg>
+        `)}`;
+      }
+      if (url.includes('nova://about')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 16v-4"/>
+            <path d="M12 8h.01"/>
+          </svg>
+        `)}`;
+      }
+      if (url.includes('nova://home')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+            <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          </svg>
+        `)}`;
+      }
+      if (url.includes('nova://')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.341 6.484A10 10 0 0 1 10.266 21.85"/>
+            <path d="M3.659 17.516A10 10 0 0 1 13.74 2.152"/>
+            <circle cx="12" cy="12" r="3"/>
+            <circle cx="19" cy="5" r="2"/>
+            <circle cx="5" cy="19" r="2"/>
+          </svg>
+        `)}`;
+      }
+
+      // For external URLs, try to get favicon through webview API or use fallback
+      const domain = new URL(url).hostname;
+      
+      // Use a simpler approach with data URI fallback
+      try {
+        // Try Google's favicon service as the primary source
+        const googleFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        
+        // Create a test image to check if the favicon loads
+        const testResult = await new Promise((resolve) => {
+          const testImg = new Image();
+          testImg.crossOrigin = 'anonymous';
+          
+          const timeout = setTimeout(() => {
+            resolve(null);
+          }, 2000);
+          
+          testImg.onload = () => {
+            clearTimeout(timeout);
+            resolve(googleFavicon);
+          };
+          
+          testImg.onerror = () => {
+            clearTimeout(timeout);
+            resolve(null);
+          };
+          
+          testImg.src = googleFavicon;
+        });
+        
+        if (testResult) {
+          return testResult;
+        }
+      } catch (error) {
+        console.warn('Failed to load favicon from Google service:', error);
+      }
+      
+      // If all external sources fail, use our default SVG
+      return getDefaultFaviconSVG();
+    } catch (error) {
+      console.warn('Error getting favicon for', url, error);
+      return getDefaultFaviconSVG();
+    }
+  }
+
+  // Bookmark folder management functions
+  async function createBookmarkFolder(name, parentId = null) {
+    try {
+      const folders = await novaSettings.get('bookmark-folders', []);
+      
+      const newFolder = {
+        id: Date.now().toString(),
+        name: name,
+        parentId: parentId,
+        dateCreated: new Date().toISOString()
+      };
+      
+      folders.push(newFolder);
+      await novaSettings.set('bookmark-folders', folders);
+      
+      console.debug('Bookmark folder created:', newFolder);
+      return newFolder;
+    } catch (error) {
+      console.error('Failed to create bookmark folder:', error);
+      throw error;
+    }
+  }
+
+  async function getBookmarkFolders() {
+    try {
+      return await novaSettings.get('bookmark-folders', []);
+    } catch (error) {
+      console.error('Failed to get bookmark folders:', error);
+      return [];
+    }
+  }
+
+  async function getBookmarksInFolder(folderId) {
+    try {
+      const bookmarks = await novaSettings.get('bookmarks', []);
+      return bookmarks.filter(bookmark => bookmark.folderId === folderId);
+    } catch (error) {
+      console.error('Failed to get bookmarks in folder:', error);
+      return [];
+    }
+  }
+
+  async function moveBookmarkToFolder(bookmarkId, folderId) {
+    try {
+      const bookmarks = await novaSettings.get('bookmarks', []);
+      const bookmarkIndex = bookmarks.findIndex(b => b.id === bookmarkId);
+      
+      if (bookmarkIndex !== -1) {
+        bookmarks[bookmarkIndex].folderId = folderId;
+        await novaSettings.set('bookmarks', bookmarks);
+        await loadBookmarksBar();
+        console.debug('Bookmark moved to folder:', bookmarkId, folderId);
+      }
+    } catch (error) {
+      console.error('Failed to move bookmark to folder:', error);
+    }
+  }
+
+  async function loadBookmarksBar() {
+    try {
+      const bookmarks = await novaSettings.get('bookmarks', []);
+      const folders = await novaSettings.get('bookmark-folders', []);
+      const container = bookmarksBar.querySelector('.bookmarks-container');
+      
+      // Clear existing bookmarks (but keep manage button)
+      const manageBtn = container.querySelector('.bookmark-manage-btn');
+      container.innerHTML = '';
+      
+      // Get root items (bookmarks and folders without parent)
+      const rootBookmarks = bookmarks.filter(b => !b.folderId);
+      const rootFolders = folders.filter(f => !f.parentId);
+      
+      // Combine and sort by date added/created
+      const rootItems = [
+        ...rootBookmarks.map(b => ({ ...b, type: 'bookmark' })),
+        ...rootFolders.map(f => ({ ...f, type: 'folder', dateAdded: f.dateCreated }))
+      ].sort((a, b) => new Date(a.dateAdded) - new Date(b.dateAdded));
+      
+      const maxVisibleItems = 4; // Reduced to show overflow more readily for testing
+      const visibleItems = rootItems.slice(0, maxVisibleItems);
+      const hiddenItems = rootItems.slice(maxVisibleItems);
+      
+      // Add visible items
+      for (const item of visibleItems) {
+        if (item.type === 'bookmark') {
+          await addBookmarkItemToBar(container, item);
+        } else if (item.type === 'folder') {
+          await addFolderItemToBar(container, item, folders, bookmarks);
+        }
+      }
+      
+      // Add overflow button if there are hidden items
+      if (hiddenItems.length > 0) {
+        const overflowBtn = document.createElement('div');
+        overflowBtn.className = 'bookmark-overflow-btn';
+        overflowBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        `;
+        overflowBtn.title = `${hiddenItems.length} more items`;
+        
+        // Create dropdown menu for hidden items
+        const dropdown = document.createElement('div');
+        dropdown.className = 'bookmark-overflow-dropdown';
+        dropdown.style.display = 'none';
+        
+        for (const item of hiddenItems) {
+          if (item.type === 'bookmark') {
+            await addBookmarkItemToDropdown(dropdown, item);
+          } else if (item.type === 'folder') {
+            await addFolderItemToDropdown(dropdown, item, folders, bookmarks);
+          }
+        }
+        
+        // Toggle dropdown on click
+        overflowBtn.onclick = (e) => {
+          e.stopPropagation();
+          const isVisible = dropdown.style.display !== 'none';
+          dropdown.style.display = isVisible ? 'none' : 'block';
+        };
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+          dropdown.style.display = 'none';
+        });
+        
+        overflowBtn.appendChild(dropdown);
+        container.appendChild(overflowBtn);
+      }
+      
+      // Re-add manage button
+      if (manageBtn) {
+        container.appendChild(manageBtn);
+      }
+    } catch (error) {
+      console.error('Failed to load bookmarks bar:', error);
+    }
+  }
+
+  async function addBookmarkItemToBar(container, bookmark) {
+    const item = document.createElement('div');
+    item.className = 'bookmark-item';
+    item.title = bookmark.title;
+    item.onclick = () => {
+      const activeWebview = getActiveWebview();
+      if (activeWebview) {
+        if (bookmark.url.startsWith('nova://')) {
+          handleNovaPage(bookmark.url, activeWebview);
+        } else {
+          activeWebview.src = bookmark.url;
+        }
+        urlInput.value = bookmark.url;
+      }
+    };
+    
+    const favicon = await getFavicon(bookmark.url);
+    
+    if (favicon.startsWith('http') || favicon.startsWith('data:image/svg+xml')) {
+      item.innerHTML = `
+        <img src="${favicon}" alt="" class="bookmark-favicon-img">
+        <span class="bookmark-title">${bookmark.title}</span>
+      `;
+    } else {
+      item.innerHTML = `
+        <span class="bookmark-favicon">${favicon}</span>
+        <span class="bookmark-title">${bookmark.title}</span>
+      `;
+    }
+    
+    container.appendChild(item);
+  }
+
+  async function addFolderItemToBar(container, folder, allFolders, allBookmarks) {
+    const item = document.createElement('div');
+    item.className = 'bookmark-folder-item';
+    item.title = folder.name;
+    
+    const folderBookmarks = allBookmarks.filter(b => b.folderId === folder.id);
+    const subFolders = allFolders.filter(f => f.parentId === folder.id);
+    
+    item.innerHTML = `
+      <span class="bookmark-folder-icon">📁</span>
+      <span class="bookmark-title">${folder.name}</span>
+      <span class="bookmark-folder-arrow">▶</span>
+    `;
+    
+    // Create folder dropdown
+    const folderDropdown = document.createElement('div');
+    folderDropdown.className = 'bookmark-folder-dropdown';
+    folderDropdown.style.display = 'none';
+    
+    // Add bookmarks in folder
+    for (const bookmark of folderBookmarks) {
+      await addBookmarkItemToDropdown(folderDropdown, bookmark);
+    }
+    
+    // Add subfolders
+    for (const subFolder of subFolders) {
+      await addFolderItemToDropdown(folderDropdown, subFolder, allFolders, allBookmarks);
+    }
+    
+    if (folderBookmarks.length === 0 && subFolders.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.className = 'bookmark-dropdown-item empty';
+      emptyItem.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Empty folder</span>';
+      folderDropdown.appendChild(emptyItem);
+    }
+    
+    // Toggle folder dropdown
+    item.onclick = (e) => {
+      e.stopPropagation();
+      const isVisible = folderDropdown.style.display !== 'none';
+      folderDropdown.style.display = isVisible ? 'none' : 'block';
+      item.querySelector('.bookmark-folder-arrow').textContent = isVisible ? '▶' : '▼';
+    };
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      folderDropdown.style.display = 'none';
+      item.querySelector('.bookmark-folder-arrow').textContent = '▶';
+    });
+    
+    item.appendChild(folderDropdown);
+    container.appendChild(item);
+  }
+
+  async function addBookmarkItemToDropdown(dropdown, bookmark) {
+    const dropdownItem = document.createElement('div');
+    dropdownItem.className = 'bookmark-dropdown-item';
+    dropdownItem.title = bookmark.title;
+    dropdownItem.onclick = (e) => {
+      e.stopPropagation();
+      const activeWebview = getActiveWebview();
+      if (activeWebview) {
+        if (bookmark.url.startsWith('nova://')) {
+          handleNovaPage(bookmark.url, activeWebview);
+        } else {
+          activeWebview.src = bookmark.url;
+        }
+        urlInput.value = bookmark.url;
+      }
+      dropdown.style.display = 'none';
+    };
+    
+    const favicon = await getFavicon(bookmark.url);
+    
+    if (favicon.startsWith('http') || favicon.startsWith('data:image/svg+xml')) {
+      dropdownItem.innerHTML = `
+        <img src="${favicon}" alt="" class="bookmark-favicon-img">
+        <span class="bookmark-title">${bookmark.title}</span>
+      `;
+    } else {
+      dropdownItem.innerHTML = `
+        <span class="bookmark-favicon">${favicon}</span>
+        <span class="bookmark-title">${bookmark.title}</span>
+      `;
+    }
+    
+    dropdown.appendChild(dropdownItem);
+  }
+
+  async function addFolderItemToDropdown(dropdown, folder, allFolders, allBookmarks) {
+    const dropdownItem = document.createElement('div');
+    dropdownItem.className = 'bookmark-dropdown-folder';
+    dropdownItem.title = folder.name;
+    
+    const folderBookmarks = allBookmarks.filter(b => b.folderId === folder.id);
+    const subFolders = allFolders.filter(f => f.parentId === folder.id);
+    
+    dropdownItem.innerHTML = `
+      <span class="bookmark-folder-icon">📁</span>
+      <span class="bookmark-title">${folder.name}</span>
+      <span class="bookmark-folder-arrow">▶</span>
+    `;
+    
+    // Create nested dropdown for folder contents
+    const nestedDropdown = document.createElement('div');
+    nestedDropdown.className = 'bookmark-nested-dropdown';
+    nestedDropdown.style.display = 'none';
+    
+    for (const bookmark of folderBookmarks) {
+      await addBookmarkItemToDropdown(nestedDropdown, bookmark);
+    }
+    
+    for (const subFolder of subFolders) {
+      await addFolderItemToDropdown(nestedDropdown, subFolder, allFolders, allBookmarks);
+    }
+    
+    if (folderBookmarks.length === 0 && subFolders.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.className = 'bookmark-dropdown-item empty';
+      emptyItem.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Empty folder</span>';
+      nestedDropdown.appendChild(emptyItem);
+    }
+    
+    dropdownItem.onclick = (e) => {
+      e.stopPropagation();
+      const isVisible = nestedDropdown.style.display !== 'none';
+      nestedDropdown.style.display = isVisible ? 'none' : 'block';
+      dropdownItem.querySelector('.bookmark-folder-arrow').textContent = isVisible ? '▶' : '▼';
+    };
+    
+    dropdownItem.appendChild(nestedDropdown);
+    dropdown.appendChild(dropdownItem);
+  }
+
+  async function initializeBookmarksSystem() {
+    try {
+      // Check if bookmarks bar should be shown
+      const showBookmarksBar = await novaSettings.get('bookmarks-bar', true);
+      if (showBookmarksBar) {
+        bookmarksBar.classList.add('show');
+      }
+      
+      // Load bookmarks into the bar
+      await loadBookmarksBar();
+      
+    } catch (error) {
+      console.error('Failed to initialize bookmarks system:', error);
+    }
+  }
+
+  async function updateBookmarksBarVisibility() {
+    try {
+      const showBookmarksBar = await novaSettings.get('bookmarks-bar', true);
+      const bookmarksBar = document.getElementById('bookmarks-bar');
+      
+      if (bookmarksBar) {
+        if (showBookmarksBar) {
+          bookmarksBar.classList.add('show');
+          bookmarksBar.style.display = 'flex';
+        } else {
+          bookmarksBar.classList.remove('show');
+          bookmarksBar.style.display = 'none';
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update bookmarks bar visibility:', error);
+    }
+  }
 });
 
 // Theme system initialization
@@ -656,6 +1248,13 @@ function applyThemeToMainWindow(theme) {
     html.setAttribute('data-theme', 'dark');
   } else {
     html.setAttribute('data-theme', 'light');
+  }
+  
+  // Reload bookmarks bar to update SVG favicon colors (with safety check)
+  if (typeof loadBookmarksBar === 'function') {
+    loadBookmarksBar().catch(error => {
+      console.warn('Failed to reload bookmarks bar after theme change:', error);
+    });
   }
   
   console.debug('[Nova Renderer] Applied theme to main window:', theme);

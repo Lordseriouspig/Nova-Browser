@@ -67,6 +67,15 @@ ipcMain.on('settings-request', (event, request) => {
   event.reply('settings-response', { requestId, success, data: result, error });
 });
 
+// IPC handler for refreshing bookmarks bar
+ipcMain.on('refresh-bookmarks-bar', (event) => {
+  // Forward the refresh request to all renderer processes
+  const allWindows = BrowserWindow.getAllWindows();
+  allWindows.forEach(window => {
+    window.webContents.send('refresh-bookmarks-bar');
+  });
+});
+
 // Register as default protocol handler for nova://
 if (process.defaultApp) {
   if (process.argv.length >= 2) {

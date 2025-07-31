@@ -72,6 +72,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
+  overflow: visible; /* Allow dropdowns to show outside viewport */
 }
 
 #toolbar {
@@ -143,6 +144,395 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Bookmarks Bar */
+.bookmarks-bar {
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 4px 8px;
+  display: none;
+  overflow: visible; /* Changed from auto to visible */
+  white-space: nowrap;
+  position: relative; /* Add position context for dropdowns */
+}
+
+.bookmarks-bar.show {
+  display: block;
+}
+
+.bookmarks-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: visible; /* Ensure dropdowns aren't clipped */
+}
+
+.bookmark-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--button-bg);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  text-decoration: none;
+}
+
+.bookmark-item:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-favicon {
+  font-size: 14px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.bookmark-favicon-img {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+  background: transparent !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.bookmark-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-manage-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: var(--button-bg);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+  min-width: 24px;
+  height: 24px;
+}
+
+.bookmark-manage-btn:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-manage-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Bookmark overflow button styles */
+.bookmark-overflow-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--button-bg);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 4px;
+  min-width: 24px;
+  height: 24px;
+}
+
+.bookmark-overflow-btn:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-overflow-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Bookmark overflow dropdown */
+.bookmark-overflow-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  min-width: 250px;
+  max-width: 400px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 4px;
+  animation: slideDown 0.3s ease-out;
+  /* Hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.bookmark-overflow-dropdown::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}
+
+.bookmark-overflow-dropdown .bookmark-dropdown-item {
+  animation: cascadeIn 0.5s ease-out backwards;
+}
+
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(1) { animation-delay: 0.1s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(2) { animation-delay: 0.2s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(3) { animation-delay: 0.3s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(4) { animation-delay: 0.4s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(5) { animation-delay: 0.5s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(6) { animation-delay: 0.6s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(7) { animation-delay: 0.7s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(8) { animation-delay: 0.8s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(9) { animation-delay: 0.9s; }
+.bookmark-overflow-dropdown .bookmark-dropdown-item:nth-child(10) { animation-delay: 1.0s; }
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cascadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 300px;
+    transform: translateY(0);
+  }
+}
+
+.bookmark-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.bookmark-dropdown-item:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-dropdown-item .bookmark-favicon {
+  min-width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bookmark-dropdown-item .bookmark-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.bookmark-dropdown-item .bookmark-favicon-img {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+  background: transparent;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.bookmark-dropdown-item .bookmark-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Force transparent backgrounds for all favicon images */
+.bookmark-favicon-img, 
+.bookmark-dropdown-item .bookmark-favicon-img {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Bookmark folder styles */
+.bookmark-folder-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.bookmark-folder-item:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-folder-icon {
+  font-size: 14px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.bookmark-folder-arrow {
+  font-size: 10px;
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.bookmark-folder-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  min-width: 250px;
+  max-width: 400px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 4px;
+  animation: slideDown 0.3s ease-out;
+  /* Hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.bookmark-folder-dropdown::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}
+
+.bookmark-folder-dropdown .bookmark-dropdown-item {
+  animation: cascadeIn 0.5s ease-out backwards;
+}
+
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(1) { animation-delay: 0.1s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(2) { animation-delay: 0.2s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(3) { animation-delay: 0.3s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(4) { animation-delay: 0.4s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(5) { animation-delay: 0.5s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(6) { animation-delay: 0.6s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(7) { animation-delay: 0.7s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(8) { animation-delay: 0.8s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(9) { animation-delay: 0.9s; }
+.bookmark-folder-dropdown .bookmark-dropdown-item:nth-child(10) { animation-delay: 1.0s; }
+
+.bookmark-dropdown-folder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.bookmark-dropdown-folder:hover {
+  background: var(--button-hover);
+}
+
+.bookmark-nested-dropdown {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1002;
+  min-width: 250px;
+  max-width: 400px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-left: 4px;
+  animation: slideDown 0.25s ease-out;
+  /* Hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.bookmark-nested-dropdown::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}
+
+.bookmark-nested-dropdown .bookmark-dropdown-item {
+  animation: cascadeIn 0.4s ease-out backwards;
+}
+
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(1) { animation-delay: 0.08s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(2) { animation-delay: 0.16s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(3) { animation-delay: 0.24s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(4) { animation-delay: 0.32s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(5) { animation-delay: 0.4s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(6) { animation-delay: 0.48s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(7) { animation-delay: 0.56s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(8) { animation-delay: 0.64s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(9) { animation-delay: 0.72s; }
+.bookmark-nested-dropdown .bookmark-dropdown-item:nth-child(10) { animation-delay: 0.8s; }
+
+.bookmark-dropdown-item.empty {
+  cursor: default;
+  padding: 12px;
+  text-align: center;
+}
+
+.bookmark-dropdown-item.empty:hover {
+  background: transparent;
 }
 
 webview {

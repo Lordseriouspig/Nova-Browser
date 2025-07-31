@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova: https://www.google.com https://icons.duckduckgo.com https:; font-src 'self' nova:; connect-src 'self' https:;">
   <title>Nova Browser - Bookmarks</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -53,6 +53,7 @@
       display: flex; align-items: center; 
       cursor: pointer;
       transition: all 0.3s ease;
+      position: relative;
     }
     .bookmark-item:hover { 
       background: var(--bg-tertiary); 
@@ -66,91 +67,985 @@
       color: var(--text-secondary); 
       font-size: 0.9em; margin-left: 10px; 
     }
-    .add-bookmark { 
-      background: var(--accent-color); 
-      color: var(--text-on-accent); 
-      border: none; padding: 10px 20px; 
-      border-radius: 5px; cursor: pointer; 
-      margin-top: 20px;
+    .bookmarks-controls {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
       transition: all 0.3s ease;
     }
-    .add-bookmark:hover { 
-      opacity: 0.9; 
-      transform: translateY(-1px);
+    .btn-primary {
+      background: var(--accent-color);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+    }
+    .btn-danger {
+      background: var(--danger-color);
+      color: white;
+    }
+    .btn-danger:hover {
+      background: var(--danger-hover);
+    }
+    .bookmark-actions {
+      position: absolute;
+      right: 10px;
+      display: none;
+      gap: 5px;
+    }
+    .bookmark-item:hover .bookmark-actions {
+      display: flex;
+    }
+    .bookmark-action-btn {
+      padding: 2px 6px;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .bookmark-delete {
+      background: var(--danger-color);
+      color: white;
+    }
+    .bookmark-edit {
+      background: var(--warning-color);
+      color: white;
+    }
+    .folder-item {
+      padding: 15px 20px;
+      margin: 10px 0;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--border-light);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .folder-item:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent-color);
+    }
+    .folder-item.expanded {
+      border-color: var(--accent-color);
+    }
+    .folder-header {
+      display: flex;
+      align-items: center;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+    .folder-icon {
+      margin-right: 10px;
+      font-size: 18px;
+    }
+    .folder-contents {
+      margin-top: 10px;
+      padding-left: 20px;
+      border-left: 2px solid var(--border-light);
+    }
+    .folder-actions {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      display: none;
+      gap: 5px;
+    }
+    .folder-item:hover .folder-actions {
+      display: flex;
+    }
+    .bookmark-item.dragging {
+      opacity: 0.5;
+    }
+    .folder-item.drag-over {
+      background: var(--accent-color);
+      color: white;
+    }
+    .move-controls {
+      position: absolute;
+      right: 120px;
+      display: none;
+      gap: 5px;
+      margin-left: 10px;
+    }
+    .bookmark-item:hover .move-controls {
+      display: flex;
+    }
+    .move-btn {
+      padding: 2px 4px;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 10px;
+      background: var(--accent-color);
+      color: white;
     }
   </style>
 </head>
 <body>
   <a href="nova://home" class="back-link">← Back to Home</a>
   <div class="container">
-    <h1>Bookmarks</h1>
+    <h1>Bookmarks Manager</h1>
     
-    <div class="bookmark-folder">
-      <div class="folder-title">Favorites</div>
-      <div class="bookmark-item" onclick="window.navigateToUrl('https://google.com')">>
-        <div class="bookmark-favicon">🌐</div>
-        <div class="bookmark-title">Google</div>
-        <div class="bookmark-url">https://google.com</div>
-      </div>
-      <div class="bookmark-item" onclick="navigateToUrl('https://github.com')">
-        <div class="bookmark-favicon">🐙</div>
-        <div class="bookmark-title">GitHub</div>
-        <div class="bookmark-url">https://github.com</div>
-      </div>
+    <div class="bookmarks-controls">
+      <button onclick="addBookmarkDialog()" class="btn btn-primary">Add Bookmark</button>
+      <button onclick="createFolderDialog()" class="btn btn-primary">Create Folder</button>
+      <button onclick="loadBookmarks(window.bookmarkNovaSettings)" class="btn btn-secondary">Refresh</button>
+      <button onclick="clearAllBookmarks()" class="btn btn-danger">Clear All</button>
     </div>
     
-    <div class="bookmark-folder">
-      <div class="folder-title">Nova Pages</div>
-      <div class="bookmark-item" onclick="navigateToUrl('nova://home')">
-        <div class="bookmark-favicon">🏠</div>
-        <div class="bookmark-title">Nova Home</div>
-        <div class="bookmark-url">nova://home</div>
-      </div>
-      <div class="bookmark-item" onclick="navigateToUrl('nova://settings')">
-        <div class="bookmark-favicon">⚙️</div>
-        <div class="bookmark-title">Settings</div>
-        <div class="bookmark-url">nova://settings</div>
-      </div>
-      <div class="bookmark-item" onclick="navigateToUrl('nova://about')">
-        <div class="bookmark-favicon">ℹ️</div>
-        <div class="bookmark-title">About</div>
-        <div class="bookmark-url">nova://about</div>
-      </div>
+    <div id="bookmarks-list">
+      <!-- Bookmarks will be loaded here -->
     </div>
-    
-    <button onclick="addBookmark()" class="add-bookmark">Add Current Page to Bookmarks</button>
   </div>
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    function addBookmark() {
-      const title = prompt('Enter bookmark title:');
-      const url = prompt('Enter bookmark URL:');
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('[Bookmarks] Page loading...');
       
-      if (title && url) {
-        // Create new bookmark item
-        const bookmarkItem = document.createElement('div');
-        bookmarkItem.className = 'bookmark-item';
-        bookmarkItem.onclick = () => navigateToUrl(url);
+      // Initialize theme first - wait for theme.js to load
+      try {
+        if (window.NovaTheme && typeof window.NovaTheme === 'function') {
+          new window.NovaTheme();
+        } else {
+          // Fallback: manually apply dark theme if needed
+          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        }
+      } catch (error) {
+        console.warn('[Bookmarks] Theme initialization failed:', error);
+        // Fallback theme handling
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      }
+      
+      if (window.setupBackLink) {
+        window.setupBackLink();
+      }
+      
+      // Get settings reference with better error handling
+      let novaSettings;
+      if (window.novaSettings) {
+        novaSettings = window.novaSettings;
+        console.log('[Bookmarks] Using window.novaSettings');
+      } else if (window.novaAPI && window.novaAPI.settings) {
+        novaSettings = window.novaAPI.settings;
+        console.log('[Bookmarks] Using window.novaAPI.settings');
+      } else {
+        console.error('[Bookmarks] No settings API available!');
+        document.getElementById('bookmarks-list').innerHTML = '<p style="color: var(--danger-color);">Settings API not available. Please reload the page.</p>';
+        return;
+      }
+      
+      // Store settings globally
+      window.bookmarkNovaSettings = novaSettings;
+      
+      console.log('[Bookmarks] Loading bookmarks...');
+      await loadBookmarks(novaSettings);
+    });
+
+    // Helper function to get theme-appropriate icon color
+    function getThemeIconColor() {
+      const theme = document.documentElement.getAttribute('data-theme');
+      return theme === 'dark' ? '#ffffff' : '#000000';
+    }
+
+    // Default SVG icon for pages without favicons
+    function getDefaultFaviconSVG() {
+      const iconColor = getThemeIconColor();
+      return `data:image/svg+xml,${encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+          <path d="M2 12h20"/>
+        </svg>
+      `)}`;
+    }
+
+    async function getFavicon(url) {
+      try {
+        // Get the current theme color for SVG icons
+        const iconColor = getThemeIconColor();
         
-        bookmarkItem.innerHTML = `
-          <div class="bookmark-favicon">🔖</div>
-          <div class="bookmark-title">${title}</div>
-          <div class="bookmark-url">${url}</div>
-        `;
+        // For nova:// pages, use predefined icons as data URIs with theme-appropriate colors
+        if (url.includes('nova://settings')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://bookmarks')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://history')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M12 7v5l4 2"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://about')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4"/>
+              <path d="M12 8h.01"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://home')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+              <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.341 6.484A10 10 0 0 1 10.266 21.85"/>
+              <path d="M3.659 17.516A10 10 0 0 1 13.74 2.152"/>
+              <circle cx="12" cy="12" r="3"/>
+              <circle cx="19" cy="5" r="2"/>
+              <circle cx="5" cy="19" r="2"/>
+            </svg>
+          `)}`;
+        }
+
+        // Try multiple favicon sources for better transparency support
+        const domain = new URL(url).hostname;
         
-        // Add to favorites folder
-        const favoritesFolder = document.querySelector('.bookmark-folder');
-        favoritesFolder.appendChild(bookmarkItem);
+        // Try different favicon sources in order of preference
+        const faviconSources = [
+          `https://icons.duckduckgo.com/ip3/${domain}.ico`, // Often has better transparency
+          `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+          `https://${domain}/favicon.ico`,
+          `https://${domain}/favicon.png`
+        ];
         
-        alert('Bookmark added successfully!');
+        // Test favicon sources one by one
+        for (const faviconUrl of faviconSources) {
+          const result = await new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              resolve(faviconUrl);
+            };
+            img.onerror = () => {
+              resolve(null);
+            };
+            img.src = faviconUrl;
+            
+            // Shorter timeout for each attempt
+            setTimeout(() => {
+              resolve(null);
+            }, 1500);
+          });
+          
+          if (result) {
+            return result;
+          }
+        }
+        
+        // If all favicon sources fail, use our default SVG
+        return getDefaultFaviconSVG();
+      } catch (error) {
+        console.warn('Error getting favicon for', url, error);
+        return getDefaultFaviconSVG();
       }
     }
 
-    // Setup back link using shared function
-    document.addEventListener('DOMContentLoaded', () => {
-      window.setupBackLink();
-    });
+    async function loadBookmarks(novaSettings) {
+      console.log('[Bookmarks] loadBookmarks called');
+      try {
+        if (!novaSettings) {
+          throw new Error('Settings API not available');
+        }
+        
+        console.log('[Bookmarks] Getting bookmarks from settings...');
+        const bookmarks = await novaSettings.get('bookmarks', []);
+        console.log('[Bookmarks] Retrieved bookmarks:', bookmarks.length, 'items');
+        
+        displayBookmarks(bookmarks, novaSettings);
+      } catch (error) {
+        console.error('[Bookmarks] Failed to load bookmarks:', error);
+        document.getElementById('bookmarks-list').innerHTML = `
+          <p style="color: var(--danger-color);">Failed to load bookmarks: ${error.message}</p>
+          <p style="color: var(--text-secondary); font-size: 0.9em;">Check the console for more details.</p>
+        `;
+      }
+    }
+
+    async function displayBookmarks(bookmarks, novaSettings) {
+      console.log('[Bookmarks] displayBookmarks called with', bookmarks.length, 'bookmarks');
+      const container = document.getElementById('bookmarks-list');
+      container.innerHTML = '';
+
+      // Get folders too
+      const folders = await novaSettings.get('bookmark-folders', []);
+      console.log('[Bookmarks] Retrieved folders:', folders.length, 'folders');
+
+      if (bookmarks.length === 0 && folders.length === 0) {
+        console.log('[Bookmarks] No bookmarks or folders to display');
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin: 40px 0;">No bookmarks yet. Start browsing and bookmark your favorite pages!</p>';
+        return;
+      }
+
+      // Display root folders first
+      const rootFolders = folders.filter(f => !f.parentId);
+      for (const folder of rootFolders) {
+        await displayFolder(container, folder, folders, bookmarks, novaSettings);
+      }
+
+      // Display root bookmarks (not in any folder)
+      const rootBookmarks = bookmarks.filter(b => !b.folderId);
+      console.log('[Bookmarks] Rendering', rootBookmarks.length, 'root bookmark items...');
+      
+      for (let i = 0; i < rootBookmarks.length; i++) {
+        const bookmark = rootBookmarks[i];
+        await displayBookmarkItem(container, bookmark, folders, novaSettings);
+      }
+      
+      console.log('[Bookmarks] Finished rendering all bookmarks and folders');
+      
+      // Store references globally for button functions
+      window.bookmarkNovaSettings = novaSettings;
+    }
+
+    // Helper function to create modal dialogs instead of using prompt()
+    function createModal(title, content, onConfirm) {
+      // Remove any existing modal
+      const existingModal = document.getElementById('bookmark-modal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      const modal = document.createElement('div');
+      modal.id = 'bookmark-modal';
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      `;
+      
+      const modalContent = document.createElement('div');
+      modalContent.style.cssText = `
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        padding: 30px;
+        min-width: 400px;
+        max-width: 90vw;
+        box-shadow: var(--shadow);
+      `;
+      
+      modalContent.innerHTML = `
+        <h3 style="margin-top: 0; color: var(--text-primary); border-bottom: 2px solid var(--accent-color); padding-bottom: 10px;">${title}</h3>
+        ${content}
+        <div style="margin-top: 30px; display: flex; gap: 10px; justify-content: flex-end;">
+          <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="modal-confirm" class="btn btn-primary">OK</button>
+        </div>
+      `;
+      
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+      
+      // Focus the first input
+      const firstInput = modalContent.querySelector('input');
+      if (firstInput) {
+        firstInput.focus();
+      }
+      
+      // Handle confirm
+      const confirmBtn = modalContent.querySelector('#modal-confirm');
+      const cancelBtn = modalContent.querySelector('#modal-cancel');
+      
+      const closeModal = () => {
+        modal.remove();
+      };
+      
+      confirmBtn.addEventListener('click', async () => {
+        if (onConfirm) {
+          const result = await onConfirm();
+          if (result !== false) {
+            closeModal();
+          }
+        } else {
+          closeModal();
+        }
+      });
+      
+      cancelBtn.addEventListener('click', closeModal);
+      
+      // Close on escape key
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          closeModal();
+          document.removeEventListener('keydown', handleEscape);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      
+      // Handle enter key in inputs
+      const inputs = modalContent.querySelectorAll('input');
+      inputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            confirmBtn.click();
+          }
+        });
+      });
+      
+      // Close on background click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          closeModal();
+        }
+      });
+      
+      return modal;
+    }
+
+    async function displayFolder(container, folder, allFolders, allBookmarks, novaSettings) {
+      const folderElement = document.createElement('div');
+      folderElement.className = 'folder-item';
+      folderElement.dataset.folderId = folder.id;
+      
+      const folderBookmarks = allBookmarks.filter(b => b.folderId === folder.id);
+      const subFolders = allFolders.filter(f => f.parentId === folder.id);
+      
+      folderElement.innerHTML = `
+        <div class="folder-header">
+          <span class="folder-icon">📁</span>
+          <span class="folder-name">${folder.name}</span>
+          <span style="color: var(--text-muted); margin-left: 10px; font-size: 0.9em;">(${folderBookmarks.length + subFolders.length} items)</span>
+          <div class="folder-actions">
+            <button class="bookmark-action-btn bookmark-edit" onclick="editFolder('${folder.id}')">Rename</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteFolder('${folder.id}')">Delete</button>
+          </div>
+        </div>
+        <div class="folder-contents" style="display: none;">
+          <!-- Folder contents will be added here -->
+        </div>
+      `;
+      
+      // Add click handler to toggle folder
+      const header = folderElement.querySelector('.folder-header');
+      const contents = folderElement.querySelector('.folder-contents');
+      header.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('bookmark-action-btn')) {
+          const isExpanded = contents.style.display !== 'none';
+          contents.style.display = isExpanded ? 'none' : 'block';
+          folderElement.classList.toggle('expanded', !isExpanded);
+          const icon = folderElement.querySelector('.folder-icon');
+          icon.textContent = isExpanded ? '📁' : '📂';
+        }
+      });
+      
+      // Add drag and drop support
+      folderElement.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        folderElement.classList.add('drag-over');
+      });
+      
+      folderElement.addEventListener('dragleave', () => {
+        folderElement.classList.remove('drag-over');
+      });
+      
+      folderElement.addEventListener('drop', (e) => {
+        e.preventDefault();
+        folderElement.classList.remove('drag-over');
+        const bookmarkId = e.dataTransfer.getData('text/plain');
+        moveBookmarkToFolder(bookmarkId, folder.id);
+      });
+      
+      container.appendChild(folderElement);
+      
+      // Add subfolders and bookmarks to contents
+      for (const subFolder of subFolders) {
+        await displayFolder(contents, subFolder, allFolders, allBookmarks, novaSettings);
+      }
+      
+      for (const bookmark of folderBookmarks) {
+        await displayBookmarkItem(contents, bookmark, allFolders, novaSettings);
+      }
+    }
+
+    async function displayBookmarkItem(container, bookmark, allFolders, novaSettings) {
+      console.log(`[Bookmarks] Rendering bookmark:`, bookmark.title);
+      
+      const item = document.createElement('div');
+      item.className = 'bookmark-item';
+      item.draggable = true;
+      item.dataset.bookmarkId = bookmark.id;
+      
+      // Get favicon
+      let favicon;
+      try {
+        favicon = await getFavicon(bookmark.url);
+      } catch (error) {
+        console.warn(`[Bookmarks] Failed to get favicon for ${bookmark.url}:`, error);
+        favicon = getDefaultFaviconSVG();
+      }
+      
+      // Check if favicon is a URL, SVG data, or emoji
+      if (favicon.startsWith('http') || favicon.startsWith('data:image/svg+xml')) {
+        item.innerHTML = `
+          <div class="bookmark-favicon"><img src="${favicon}" alt="" style="width: 16px; height: 16px; object-fit: contain; border-radius: 2px; background: transparent;"></div>
+          <div style="flex: 1;">
+            <div class="bookmark-title">${bookmark.title}</div>
+            <div class="bookmark-url">${bookmark.url}</div>
+          </div>
+          <div class="move-controls">
+            <select class="move-btn" onchange="moveBookmarkToFolder('${bookmark.id}', this.value)">
+              <option value="">Move to...</option>
+              <option value="">📁 Root</option>
+              ${allFolders.map(f => `<option value="${f.id}">📁 ${f.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="bookmark-actions">
+            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${bookmark.id}')">Edit</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${bookmark.id}')">Delete</button>
+          </div>
+        `;
+      } else {
+        item.innerHTML = `
+          <div class="bookmark-favicon">${favicon}</div>
+          <div style="flex: 1;">
+            <div class="bookmark-title">${bookmark.title}</div>
+            <div class="bookmark-url">${bookmark.url}</div>
+          </div>
+          <div class="move-controls">
+            <select class="move-btn" onchange="moveBookmarkToFolder('${bookmark.id}', this.value)">
+              <option value="">Move to...</option>
+              <option value="">📁 Root</option>
+              ${allFolders.map(f => `<option value="${f.id}">📁 ${f.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="bookmark-actions">
+            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${bookmark.id}')">Edit</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${bookmark.id}')">Delete</button>
+          </div>
+        `;
+      }
+      
+      // Add drag support
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', bookmark.id);
+        item.classList.add('dragging');
+      });
+      
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+      });
+      
+      // Add click handler for navigation
+      item.addEventListener('click', (e) => {
+        // Don't navigate if clicking on action buttons or move controls
+        if (!e.target.classList.contains('bookmark-action-btn') && 
+            !e.target.classList.contains('move-btn')) {
+          // Use IPC to navigate to URL
+          if (window.novaAPI && window.novaAPI.ipc) {
+            window.novaAPI.ipc.send('navigate', bookmark.url);
+          } else if (window.navigateToUrl) {
+            window.navigateToUrl(bookmark.url);
+          } else {
+            // Fallback: try to open in same window
+            window.location.href = bookmark.url;
+          }
+        }
+      });
+      
+      container.appendChild(item);
+    }
+
+    async function addBookmarkDialog() {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      // Create a modal dialog instead of using prompt()
+      const modal = createModal('Add Bookmark', `
+        <div style="margin: 20px 0;">
+          <label style="display: block; margin-bottom: 5px;">Title:</label>
+          <input type="text" id="bookmark-title" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);" placeholder="Enter bookmark title">
+        </div>
+        <div style="margin: 20px 0;">
+          <label style="display: block; margin-bottom: 5px;">URL:</label>
+          <input type="url" id="bookmark-url" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);" placeholder="Enter bookmark URL">
+        </div>
+      `, async () => {
+        const title = document.getElementById('bookmark-title').value.trim();
+        const url = document.getElementById('bookmark-url').value.trim();
+        
+        if (!title || !url) {
+          alert('Please enter both title and URL');
+          return false;
+        }
+        
+        try {
+          const bookmarks = await novaSettings.get('bookmarks', []);
+          
+          // Check if bookmark already exists
+          const exists = bookmarks.some(bookmark => bookmark.url === url);
+          if (exists) {
+            alert('This URL is already bookmarked!');
+            return false;
+          }
+          
+          const newBookmark = {
+            id: Date.now().toString(),
+            title: title,
+            url: url,
+            favicon: await getFavicon(url),
+            dateAdded: new Date().toISOString()
+          };
+          
+          bookmarks.push(newBookmark);
+          await novaSettings.set('bookmarks', bookmarks);
+          await loadBookmarks(novaSettings);
+          
+          // Refresh the bookmarks bar in the main window
+          if (window.novaAPI && window.novaAPI.ipc) {
+            window.novaAPI.ipc.send('refresh-bookmarks-bar');
+          }
+          
+          alert('Bookmark added successfully!');
+          return true;
+        } catch (error) {
+          console.error('Failed to add bookmark:', error);
+          alert('Failed to add bookmark');
+          return false;
+        }
+      });
+    }
+
+    async function editBookmark(id) {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      try {
+        const bookmarks = await novaSettings.get('bookmarks', []);
+        const bookmark = bookmarks.find(b => b.id === id);
+        
+        if (!bookmark) {
+          alert('Bookmark not found');
+          return;
+        }
+        
+        // Create a modal dialog for editing
+        const modal = createModal('Edit Bookmark', `
+          <div style="margin: 20px 0;">
+            <label style="display: block; margin-bottom: 5px;">Title:</label>
+            <input type="text" id="edit-bookmark-title" value="${bookmark.title}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+          </div>
+          <div style="margin: 20px 0;">
+            <label style="display: block; margin-bottom: 5px;">URL:</label>
+            <input type="url" id="edit-bookmark-url" value="${bookmark.url}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+          </div>
+        `, async () => {
+          const newTitle = document.getElementById('edit-bookmark-title').value.trim();
+          const newUrl = document.getElementById('edit-bookmark-url').value.trim();
+          
+          if (!newTitle || !newUrl) {
+            alert('Please enter both title and URL');
+            return false;
+          }
+          
+          bookmark.title = newTitle;
+          bookmark.url = newUrl;
+          bookmark.favicon = await getFavicon(newUrl);
+          
+          await novaSettings.set('bookmarks', bookmarks);
+          await loadBookmarks(novaSettings);
+          
+          // Refresh the bookmarks bar in the main window
+          if (window.novaAPI && window.novaAPI.ipc) {
+            window.novaAPI.ipc.send('refresh-bookmarks-bar');
+          }
+          
+          alert('Bookmark updated successfully!');
+          return true;
+        });
+      } catch (error) {
+        console.error('Failed to edit bookmark:', error);
+        alert('Failed to edit bookmark');
+      }
+    }
+
+    async function deleteBookmark(id) {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to delete this bookmark?')) {
+        return;
+      }
+      
+      try {
+        const bookmarks = await novaSettings.get('bookmarks', []);
+        const filteredBookmarks = bookmarks.filter(b => b.id !== id);
+        
+        await novaSettings.set('bookmarks', filteredBookmarks);
+        await loadBookmarks(novaSettings);
+        
+        // Refresh the bookmarks bar in the main window
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('refresh-bookmarks-bar');
+        }
+        
+        alert('Bookmark deleted successfully!');
+      } catch (error) {
+        console.error('Failed to delete bookmark:', error);
+        alert('Failed to delete bookmark');
+      }
+    }
+
+    async function clearAllBookmarks() {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to delete ALL bookmarks? This cannot be undone.')) {
+        return;
+      }
+      
+      try {
+        await novaSettings.set('bookmarks', []);
+        await loadBookmarks(novaSettings);
+        
+        // Refresh the bookmarks bar in the main window
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('refresh-bookmarks-bar');
+        }
+        
+        alert('All bookmarks cleared successfully!');
+      } catch (error) {
+        console.error('Failed to clear bookmarks:', error);
+        alert('Failed to clear bookmarks');
+      }
+    }
+
+    async function createFolderDialog() {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      // Create a modal dialog instead of using prompt()
+      const modal = createModal('Create Folder', `
+        <div style="margin: 20px 0;">
+          <label style="display: block; margin-bottom: 5px;">Folder Name:</label>
+          <input type="text" id="folder-name" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);" placeholder="Enter folder name">
+        </div>
+      `, async () => {
+        const folderName = document.getElementById('folder-name').value.trim();
+        
+        if (!folderName) {
+          alert('Please enter a folder name');
+          return false;
+        }
+        
+        try {
+          const folders = await novaSettings.get('bookmark-folders', []);
+          
+          const newFolder = {
+            id: Date.now().toString(),
+            name: folderName,
+            parentId: null,
+            dateCreated: new Date().toISOString()
+          };
+          
+          folders.push(newFolder);
+          await novaSettings.set('bookmark-folders', folders);
+          await loadBookmarks(novaSettings);
+          
+          // Refresh the bookmarks bar in the main window
+          if (window.novaAPI && window.novaAPI.ipc) {
+            window.novaAPI.ipc.send('refresh-bookmarks-bar');
+          }
+          
+          alert('Folder created successfully!');
+          return true;
+        } catch (error) {
+          console.error('Failed to create folder:', error);
+          alert('Failed to create folder');
+          return false;
+        }
+      });
+    }
+
+    async function editFolder(folderId) {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      try {
+        const folders = await novaSettings.get('bookmark-folders', []);
+        const folder = folders.find(f => f.id === folderId);
+        
+        if (!folder) {
+          alert('Folder not found');
+          return;
+        }
+        
+        // Create a modal dialog for editing folder name
+        const modal = createModal('Edit Folder', `
+          <div style="margin: 20px 0;">
+            <label style="display: block; margin-bottom: 5px;">Folder Name:</label>
+            <input type="text" id="edit-folder-name" value="${folder.name}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+          </div>
+        `, async () => {
+          const newName = document.getElementById('edit-folder-name').value.trim();
+          
+          if (!newName) {
+            alert('Please enter a folder name');
+            return false;
+          }
+          
+          folder.name = newName;
+          
+          await novaSettings.set('bookmark-folders', folders);
+          await loadBookmarks(novaSettings);
+          
+          // Refresh the bookmarks bar in the main window
+          if (window.novaAPI && window.novaAPI.ipc) {
+            window.novaAPI.ipc.send('refresh-bookmarks-bar');
+          }
+          
+          alert('Folder renamed successfully!');
+          return true;
+        });
+      } catch (error) {
+        console.error('Failed to edit folder:', error);
+        alert('Failed to edit folder');
+      }
+    }
+
+    async function deleteFolder(folderId) {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      if (!confirm('Are you sure you want to delete this folder? All bookmarks in the folder will be moved to the root level.')) {
+        return;
+      }
+      
+      try {
+        const folders = await novaSettings.get('bookmark-folders', []);
+        const bookmarks = await novaSettings.get('bookmarks', []);
+        
+        // Move all bookmarks in this folder to root
+        bookmarks.forEach(bookmark => {
+          if (bookmark.folderId === folderId) {
+            bookmark.folderId = null;
+          }
+        });
+        
+        // Remove the folder
+        const filteredFolders = folders.filter(f => f.id !== folderId && f.parentId !== folderId);
+        
+        await novaSettings.set('bookmark-folders', filteredFolders);
+        await novaSettings.set('bookmarks', bookmarks);
+        await loadBookmarks(novaSettings);
+        
+        // Refresh the bookmarks bar in the main window
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('refresh-bookmarks-bar');
+        }
+        
+        alert('Folder deleted successfully!');
+      } catch (error) {
+        console.error('Failed to delete folder:', error);
+        alert('Failed to delete folder');
+      }
+    }
+
+    async function moveBookmarkToFolder(bookmarkId, folderId) {
+      const novaSettings = window.bookmarkNovaSettings;
+      if (!novaSettings) {
+        alert('Settings API not available');
+        return;
+      }
+      
+      try {
+        const bookmarks = await novaSettings.get('bookmarks', []);
+        const bookmark = bookmarks.find(b => b.id === bookmarkId);
+        
+        if (!bookmark) {
+          alert('Bookmark not found');
+          return;
+        }
+        
+        bookmark.folderId = folderId || null;
+        
+        await novaSettings.set('bookmarks', bookmarks);
+        await loadBookmarks(novaSettings);
+        
+        // Refresh the bookmarks bar in the main window
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('refresh-bookmarks-bar');
+        }
+        
+        console.log('Bookmark moved successfully');
+      } catch (error) {
+        console.error('Failed to move bookmark:', error);
+        alert('Failed to move bookmark');
+      }
+    }
   </script>
 </body>
 </html>
