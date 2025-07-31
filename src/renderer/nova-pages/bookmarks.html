@@ -385,6 +385,19 @@
       }
     }
 
+    // Helper function to safely escape HTML content to prevent XSS
+    function escapeHtml(unsafe) {
+      if (typeof unsafe !== 'string') {
+        return String(unsafe);
+      }
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     async function loadBookmarks(novaSettings) {
       console.log('[Bookmarks] loadBookmarks called');
       try {
@@ -399,10 +412,21 @@
         displayBookmarks(bookmarks, novaSettings);
       } catch (error) {
         console.error('[Bookmarks] Failed to load bookmarks:', error);
-        document.getElementById('bookmarks-list').innerHTML = `
-          <p style="color: var(--danger-color);">Failed to load bookmarks: ${error.message}</p>
-          <p style="color: var(--text-secondary); font-size: 0.9em;">Check the console for more details.</p>
-        `;
+        // Create error elements safely to prevent XSS
+        const container = document.getElementById('bookmarks-list');
+        container.innerHTML = '';
+        
+        const errorP = document.createElement('p');
+        errorP.style.color = 'var(--danger-color)';
+        errorP.textContent = `Failed to load bookmarks: ${error.message || 'Unknown error'}`;
+        
+        const detailsP = document.createElement('p');
+        detailsP.style.color = 'var(--text-secondary)';
+        detailsP.style.fontSize = '0.9em';
+        detailsP.textContent = 'Check the console for more details.';
+        
+        container.appendChild(errorP);
+        container.appendChild(detailsP);
       }
     }
 
@@ -553,14 +577,18 @@
       const folderBookmarks = allBookmarks.filter(b => b.folderId === folder.id);
       const subFolders = allFolders.filter(f => f.parentId === folder.id);
       
+      // Safely escape folder data to prevent XSS
+      const safeFolderName = escapeHtml(folder.name);
+      const safeFolderId = escapeHtml(folder.id);
+      
       folderElement.innerHTML = `
         <div class="folder-header">
           <span class="folder-icon">📁</span>
-          <span class="folder-name">${folder.name}</span>
+          <span class="folder-name">${safeFolderName}</span>
           <span style="color: var(--text-muted); margin-left: 10px; font-size: 0.9em;">(${folderBookmarks.length + subFolders.length} items)</span>
           <div class="folder-actions">
-            <button class="bookmark-action-btn bookmark-edit" onclick="editFolder('${folder.id}')">Rename</button>
-            <button class="bookmark-action-btn bookmark-delete" onclick="deleteFolder('${folder.id}')">Delete</button>
+            <button class="bookmark-action-btn bookmark-edit" onclick="editFolder('${safeFolderId}')">Rename</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteFolder('${safeFolderId}')">Delete</button>
           </div>
         </div>
         <div class="folder-contents" style="display: none;">
@@ -629,41 +657,51 @@
       
       // Check if favicon is a URL, SVG data, or emoji
       if (favicon.startsWith('http') || favicon.startsWith('data:image/svg+xml')) {
+        // Safely escape user-controlled data to prevent XSS
+        const safeTitle = escapeHtml(bookmark.title);
+        const safeUrl = escapeHtml(bookmark.url);
+        const safeFavicon = escapeHtml(favicon);
+        
         item.innerHTML = `
-          <div class="bookmark-favicon"><img src="${favicon}" alt="" style="width: 16px; height: 16px; object-fit: contain; border-radius: 2px; background: transparent;"></div>
+          <div class="bookmark-favicon"><img src="${safeFavicon}" alt="" style="width: 16px; height: 16px; object-fit: contain; border-radius: 2px; background: transparent;"></div>
           <div style="flex: 1;">
-            <div class="bookmark-title">${bookmark.title}</div>
-            <div class="bookmark-url">${bookmark.url}</div>
+            <div class="bookmark-title">${safeTitle}</div>
+            <div class="bookmark-url">${safeUrl}</div>
           </div>
           <div class="move-controls">
-            <select class="move-btn" onchange="moveBookmarkToFolder('${bookmark.id}', this.value)">
+            <select class="move-btn" onchange="moveBookmarkToFolder('${escapeHtml(bookmark.id)}', this.value)">
               <option value="">Move to...</option>
               <option value="">📁 Root</option>
-              ${allFolders.map(f => `<option value="${f.id}">📁 ${f.name}</option>`).join('')}
+              ${allFolders.map(f => `<option value="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</option>`).join('')}
             </select>
           </div>
           <div class="bookmark-actions">
-            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${bookmark.id}')">Edit</button>
-            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${bookmark.id}')">Delete</button>
+            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${escapeHtml(bookmark.id)}')">Edit</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${escapeHtml(bookmark.id)}')">Delete</button>
           </div>
         `;
       } else {
+        // Safely escape user-controlled data to prevent XSS
+        const safeTitle = escapeHtml(bookmark.title);
+        const safeUrl = escapeHtml(bookmark.url);
+        const safeFavicon = escapeHtml(favicon);
+        
         item.innerHTML = `
-          <div class="bookmark-favicon">${favicon}</div>
+          <div class="bookmark-favicon">${safeFavicon}</div>
           <div style="flex: 1;">
-            <div class="bookmark-title">${bookmark.title}</div>
-            <div class="bookmark-url">${bookmark.url}</div>
+            <div class="bookmark-title">${safeTitle}</div>
+            <div class="bookmark-url">${safeUrl}</div>
           </div>
           <div class="move-controls">
-            <select class="move-btn" onchange="moveBookmarkToFolder('${bookmark.id}', this.value)">
+            <select class="move-btn" onchange="moveBookmarkToFolder('${escapeHtml(bookmark.id)}', this.value)">
               <option value="">Move to...</option>
               <option value="">📁 Root</option>
-              ${allFolders.map(f => `<option value="${f.id}">📁 ${f.name}</option>`).join('')}
+              ${allFolders.map(f => `<option value="${escapeHtml(f.id)}">📁 ${escapeHtml(f.name)}</option>`).join('')}
             </select>
           </div>
           <div class="bookmark-actions">
-            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${bookmark.id}')">Edit</button>
-            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${bookmark.id}')">Delete</button>
+            <button class="bookmark-action-btn bookmark-edit" onclick="editBookmark('${escapeHtml(bookmark.id)}')">Edit</button>
+            <button class="bookmark-action-btn bookmark-delete" onclick="deleteBookmark('${escapeHtml(bookmark.id)}')">Delete</button>
           </div>
         `;
       }
@@ -781,11 +819,11 @@
         const modal = createModal('Edit Bookmark', `
           <div style="margin: 20px 0;">
             <label style="display: block; margin-bottom: 5px;">Title:</label>
-            <input type="text" id="edit-bookmark-title" value="${bookmark.title}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+            <input type="text" id="edit-bookmark-title" value="${escapeHtml(bookmark.title)}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
           </div>
           <div style="margin: 20px 0;">
             <label style="display: block; margin-bottom: 5px;">URL:</label>
-            <input type="url" id="edit-bookmark-url" value="${bookmark.url}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+            <input type="url" id="edit-bookmark-url" value="${escapeHtml(bookmark.url)}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
           </div>
         `, async () => {
           const newTitle = document.getElementById('edit-bookmark-title').value.trim();
@@ -944,7 +982,7 @@
         const modal = createModal('Edit Folder', `
           <div style="margin: 20px 0;">
             <label style="display: block; margin-bottom: 5px;">Folder Name:</label>
-            <input type="text" id="edit-folder-name" value="${folder.name}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+            <input type="text" id="edit-folder-name" value="${escapeHtml(folder.name)}" style="width: 100%; padding: 8px; border: 1px solid var(--border-light); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
           </div>
         `, async () => {
           const newName = document.getElementById('edit-folder-name').value.trim();

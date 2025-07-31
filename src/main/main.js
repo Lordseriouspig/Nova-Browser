@@ -139,51 +139,125 @@ if (!gotTheLock) {
       
       console.debug('[Nova Protocol] Handling nova:// request for page:', page);
       
+      // Security: Sanitize the page input to prevent path traversal
+      if (!page || typeof page !== 'string') {
+        console.warn('[Nova Protocol] Invalid page parameter');
+        callback({ error: -6 });
+        return;
+      }
+      
+      // Remove any path traversal attempts and normalize
+      const sanitizedPage = page
+        .replace(/\.\./g, '') // Remove all .. sequences
+        .replace(/[\/\\]/g, '') // Remove all path separators
+        .replace(/[^a-zA-Z0-9\-_.]/g, ''); // Only allow safe characters
+      
+      // Validate that sanitized page is not empty and matches expected pattern
+      if (!sanitizedPage || sanitizedPage.length === 0) {
+        console.warn('[Nova Protocol] Empty or invalid page after sanitization');
+        callback({ error: -6 });
+        return;
+      }
+      
+      // Whitelist of allowed pages/files to further restrict access
+      const allowedPages = [
+        'home', 'about', 'settings', 'bookmarks', 'history', 'test', '404',
+        'shared/theme.css', 'shared/theme.js'
+      ];
+      
+      const isAllowed = allowedPages.some(allowed => 
+        sanitizedPage === allowed || 
+        sanitizedPage === allowed.replace(/[\/\\]/g, '') ||
+        (allowed.includes('/') && sanitizedPage === allowed.split('/').pop())
+      );
+      
+      if (!isAllowed) {
+        console.warn('[Nova Protocol] Page not in allowlist:', sanitizedPage);
+        // Load 404 page for unauthorized access attempts
+        const notFoundPath = path.join(__dirname, '../renderer/nova-pages', '404.html');
+        if (fs.existsSync(notFoundPath)) {
+          let htmlContent = fs.readFileSync(notFoundPath, 'utf8');
+          htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, sanitizedPage);
+          callback({ data: htmlContent, mimeType: 'text/html' });
+        } else {
+          callback({ error: -6 });
+        }
+        return;
+      }
+      
       try {
-        // Check if it's a CSS or JS file
-        if (page.endsWith('.css')) {
-          const cssPath = path.join(__dirname, '../renderer/nova-pages', page);
+        // Define allowed directory once for all security checks
+        const allowedDir = path.resolve(__dirname, '../renderer/nova-pages');
+        
+        // Check if it's a CSS or JS file (using sanitized page)
+        if (sanitizedPage.endsWith('.css')) {
+          const cssPath = path.join(__dirname, '../renderer/nova-pages', sanitizedPage);
           
-          if (fs.existsSync(cssPath)) {
-            const cssContent = fs.readFileSync(cssPath, 'utf8');
-            console.debug('[Nova Protocol] Loaded CSS:', page);
+          // Additional security: ensure the resolved path is within our directory
+          const resolvedPath = path.resolve(cssPath);
+          if (!resolvedPath.startsWith(allowedDir)) {
+            console.warn('[Nova Protocol] Path traversal attempt blocked:', cssPath);
+            callback({ error: -6 });
+            return;
+          }
+          
+          if (fs.existsSync(resolvedPath)) {
+            const cssContent = fs.readFileSync(resolvedPath, 'utf8');
+            console.debug('[Nova Protocol] Loaded CSS:', sanitizedPage);
             callback({ data: cssContent, mimeType: 'text/css' });
             return;
           }
         }
         
-        if (page.endsWith('.js')) {
-          const jsPath = path.join(__dirname, '../renderer/nova-pages', page);
+        if (sanitizedPage.endsWith('.js')) {
+          const jsPath = path.join(__dirname, '../renderer/nova-pages', sanitizedPage);
           
-          if (fs.existsSync(jsPath)) {
-            const jsContent = fs.readFileSync(jsPath, 'utf8');
-            console.debug('[Nova Protocol] Loaded JS:', page);
+          // Additional security: ensure the resolved path is within our directory
+          const resolvedPath = path.resolve(jsPath);
+          if (!resolvedPath.startsWith(allowedDir)) {
+            console.warn('[Nova Protocol] Path traversal attempt blocked:', jsPath);
+            callback({ error: -6 });
+            return;
+          }
+          
+          if (fs.existsSync(resolvedPath)) {
+            const jsContent = fs.readFileSync(resolvedPath, 'utf8');
+            console.debug('[Nova Protocol] Loaded JS:', sanitizedPage);
             callback({ data: jsContent, mimeType: 'application/javascript' });
             return;
           }
         }
         
-        // Handle HTML pages
-        const novaPagePath = path.join(__dirname, '../renderer/nova-pages', `${page}.html`);
+        // Handle HTML pages (using sanitized page)
+        const novaPagePath = path.join(__dirname, '../renderer/nova-pages', `${sanitizedPage}.html`);
         
-        if (fs.existsSync(novaPagePath)) {
-          let htmlContent = fs.readFileSync(novaPagePath, 'utf8');
+        // Additional security: ensure the resolved path is within our directory
+        const resolvedHtmlPath = path.resolve(novaPagePath);
+        if (!resolvedHtmlPath.startsWith(allowedDir)) {
+          console.warn('[Nova Protocol] Path traversal attempt blocked:', novaPagePath);
+          callback({ error: -6 });
+          return;
+        }
+        
+        if (fs.existsSync(resolvedHtmlPath)) {
+          let htmlContent = fs.readFileSync(resolvedHtmlPath, 'utf8');
           
-          // Replace placeholders
+          // Replace placeholders (use sanitized page for safety)
           htmlContent = htmlContent
-            .replace(/\{\{PAGE\}\}/g, page)
+            .replace(/\{\{PAGE\}\}/g, sanitizedPage)
             .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
             .replace(/\{\{VERSION\}\}/g, '1.0.0');
           
-          console.debug('[Nova Protocol] Loaded nova:// page:', page);
+          console.debug('[Nova Protocol] Loaded nova:// page:', sanitizedPage);
           callback({ data: htmlContent, mimeType: 'text/html' });
         } else {
           // Load 404 page
           const notFoundPath = path.join(__dirname, '../renderer/nova-pages', '404.html');
-          if (fs.existsSync(notFoundPath)) {
-            let htmlContent = fs.readFileSync(notFoundPath, 'utf8');
-            htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, page);
-            console.debug('[Nova Protocol] Loaded 404 page for:', page);
+          const resolved404Path = path.resolve(notFoundPath);
+          if (resolved404Path.startsWith(allowedDir) && fs.existsSync(resolved404Path)) {
+            let htmlContent = fs.readFileSync(resolved404Path, 'utf8');
+            htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, sanitizedPage);
+            console.debug('[Nova Protocol] Loaded 404 page for:', sanitizedPage);
             callback({ data: htmlContent, mimeType: 'text/html' });
           } else {
             // Fallback 404
@@ -193,7 +267,7 @@ if (!gotTheLock) {
               <head><title>Not Found - Nova Browser</title></head>
               <body>
                 <h1>Page Not Found</h1>
-                <p>Could not load nova://${page}</p>
+                <p>Could not load nova://${sanitizedPage}</p>
                 <p><a href="nova://home">Go to Nova Home</a></p>
               </body>
               </html>

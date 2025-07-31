@@ -1217,7 +1217,34 @@ function initializeThemeSystem() {
   });
   
   window.addEventListener('message', (event) => {
+    // Security: Validate message origin to prevent malicious sites from sending messages
+    const allowedOrigins = [
+      'nova://home',
+      'nova://settings', 
+      'nova://bookmarks',
+      'nova://history',
+      'nova://about',
+      'nova://test'
+    ];
+    
+    // Check if the message origin is from a trusted nova:// page
+    const isValidOrigin = allowedOrigins.some(origin => event.origin === origin) ||
+                         event.origin === window.location.origin ||
+                         event.origin === 'null' && event.source === window; // Self-messages
+    
+    if (!isValidOrigin) {
+      console.warn('[Nova Renderer] Rejected message from untrusted origin:', event.origin);
+      return;
+    }
+    
     if (event.data && event.data.type === 'nova-theme-changed') {
+      // Additional validation: ensure the theme value is safe
+      const validThemes = ['dark', 'light'];
+      if (!validThemes.includes(event.data.theme)) {
+        console.warn('[Nova Renderer] Invalid theme value received:', event.data.theme);
+        return;
+      }
+      
       applyThemeToMainWindow(event.data.theme);
       localStorage.setItem('nova-theme', event.data.theme);
     }
