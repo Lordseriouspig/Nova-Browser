@@ -1,20 +1,18 @@
 /**
- * Nova Browser Theme System
  * Shared theme utilities for consistent theming across all Nova pages
  */
 
 class NovaTheme {
   constructor() {
-    this.currentTheme = 'light';
+    this.currentTheme = 'dark';
     this.init();
   }
 
   // Initialize theme system
   init() {
-    // Apply saved theme immediately
+
     this.applyStoredTheme();
     
-    // Listen for theme changes from other pages
     window.addEventListener('storage', (e) => {
       if (e.key === 'nova-theme') {
         this.applyTheme(e.newValue);
@@ -26,29 +24,25 @@ class NovaTheme {
   async applyStoredTheme() {
     const savedTheme = localStorage.getItem('nova-theme');
     
-    let themeToApply = 'light'; // Default to light theme
+    let themeToApply = 'dark';
     
     if (savedTheme) {
-      // Use saved preference
       themeToApply = savedTheme;
     } else {
-      // Try to get from Nova settings as fallback
       if (window.novaSettings) {
         try {
           const darkMode = await window.novaSettings.get('dark-mode', false);
           themeToApply = darkMode ? 'dark' : 'light';
         } catch (error) {
-          console.log('Could not get theme from Nova settings, using default light theme:', error);
+          console.warn('Could not get theme from Nova settings:', error);
         }
       }
-      
-      console.log('No stored theme preference, using default light theme');
     }
     
     this.applyTheme(themeToApply);
   }
 
-  // Apply theme to document
+  // Apply theme
   applyTheme(theme) {
     const html = document.documentElement;
     
@@ -60,10 +54,8 @@ class NovaTheme {
       this.currentTheme = 'light';
     }
 
-    // Update theme toggle buttons if they exist
     this.updateThemeToggles();
     
-    // Dispatch theme change event
     window.dispatchEvent(new CustomEvent('nova-theme-changed', {
       detail: { theme: this.currentTheme }
     }));
@@ -73,13 +65,11 @@ class NovaTheme {
   async toggleTheme() {
     const newTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
     
-    // Apply theme immediately
     this.applyTheme(newTheme);
     
-    // Store preference
     localStorage.setItem('nova-theme', newTheme);
     
-    // Update settings if available
+
     if (window.novaSettings) {
       try {
         await window.novaSettings.set('dark-mode', newTheme === 'dark');
@@ -88,7 +78,6 @@ class NovaTheme {
       }
     }
     
-    // Notify main window via postMessage if we're in a webview
     if (window !== window.parent) {
       try {
         window.parent.postMessage({
@@ -96,7 +85,7 @@ class NovaTheme {
           theme: newTheme
         }, '*');
       } catch (error) {
-        console.log('Could not notify parent window of theme change:', error);
+        console.warn('Could not notify parent window of theme change:', error);
       }
     }
     
@@ -130,14 +119,13 @@ class NovaTheme {
   // Set theme programmatically
   async setTheme(theme) {
     if (theme !== 'light' && theme !== 'dark') {
-      console.warn('Invalid theme:', theme, 'Using light theme instead');
-      theme = 'light';
+      console.warn('Invalid theme:', theme);
+      theme = 'dark';
     }
     
     this.applyTheme(theme);
     localStorage.setItem('nova-theme', theme);
     
-    // Update settings if available
     if (window.novaSettings) {
       try {
         await window.novaSettings.set('dark-mode', theme === 'dark');
@@ -149,15 +137,11 @@ class NovaTheme {
     return theme;
   }
 
-  // Reset to default light theme
   async resetToDefaultTheme() {
-    // Remove stored preference to use default light theme
     localStorage.removeItem('nova-theme');
     
-    // Apply light theme
-    this.applyTheme('light');
+    this.applyTheme('dark');
     
-    // Update settings
     if (window.novaSettings) {
       try {
         await window.novaSettings.set('dark-mode', false);
@@ -166,8 +150,8 @@ class NovaTheme {
       }
     }
     
-    console.log('Reset to default light theme');
-    return 'light';
+    console.debug('Reset to default theme');
+    return 'dark';
   }
 
   // Load theme from Nova settings
@@ -188,25 +172,36 @@ class NovaTheme {
   }
 }
 
-// Create global theme instance
-console.log('Creating NovaTheme instance...');
+// Create theme instance
 window.NovaTheme = new NovaTheme();
 
 // Convenience functions for global access
 window.toggleTheme = () => {
-  console.log('toggleTheme called');
   return window.NovaTheme.toggleTheme();
 };
 window.setTheme = (theme) => window.NovaTheme.setTheme(theme);
 window.getCurrentTheme = () => window.NovaTheme.getCurrentTheme();
 window.resetToDefaultTheme = () => window.NovaTheme.resetToDefaultTheme();
 
-console.log('Nova Theme system loaded. Available functions:', {
-  toggleTheme: typeof window.toggleTheme,
-  setTheme: typeof window.setTheme,
-  getCurrentTheme: typeof window.getCurrentTheme,
-  resetToDefaultTheme: typeof window.resetToDefaultTheme
-});
+// Shared navigation function
+window.navigateToUrl = (url) => {
+  if (window.navigateFromNova) {
+    window.navigateFromNova(url);
+  } else {
+    window.location.href = url;
+  }
+};
+
+// Shared back link setup function
+window.setupBackLink = () => {
+  const backLink = document.querySelector('.back-link');
+  if (backLink) {
+    backLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.navigateToUrl('nova://home');
+    });
+  }
+};
 
 // Dispatch event when theme system is ready
 window.dispatchEvent(new CustomEvent('nova-theme-ready', {

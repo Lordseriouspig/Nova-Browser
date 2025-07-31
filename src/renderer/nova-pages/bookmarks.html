@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>Nova Browser - Bookmarks</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -85,8 +86,8 @@
     <h1>Bookmarks</h1>
     
     <div class="bookmark-folder">
-      <div class="folder-title">📁 Favorites</div>
-      <div class="bookmark-item" onclick="navigateToUrl('https://google.com')">
+      <div class="folder-title">Favorites</div>
+      <div class="bookmark-item" onclick="window.navigateToUrl('https://google.com')">>
         <div class="bookmark-favicon">🌐</div>
         <div class="bookmark-title">Google</div>
         <div class="bookmark-url">https://google.com</div>
@@ -99,7 +100,7 @@
     </div>
     
     <div class="bookmark-folder">
-      <div class="folder-title">📁 Nova Pages</div>
+      <div class="folder-title">Nova Pages</div>
       <div class="bookmark-item" onclick="navigateToUrl('nova://home')">
         <div class="bookmark-favicon">🏠</div>
         <div class="bookmark-title">Nova Home</div>
@@ -122,19 +123,6 @@
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    // Bookmarks page - theme handled automatically by shared system
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('Bookmarks page loaded - theme handled by shared system');
-    });
-
-    function navigateToUrl(url) {
-      if (window.navigateFromNova) {
-        window.navigateFromNova(url);
-      } else {
-        window.location.href = url;
-      }
-    }
-
     function addBookmark() {
       const title = prompt('Enter bookmark title:');
       const url = prompt('Enter bookmark URL:');
@@ -159,10 +147,9 @@
       }
     }
 
-    // Make back link functional
-    document.querySelector('.back-link').addEventListener('click', function(e) {
-      e.preventDefault();
-      navigateToUrl('nova://home');
+    // Setup back link using shared function
+    document.addEventListener('DOMContentLoaded', () => {
+      window.setupBackLink();
     });
   </script>
 </body>

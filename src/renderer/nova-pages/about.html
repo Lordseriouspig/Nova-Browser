@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>About Nova Browser</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -128,23 +129,9 @@
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    // About page - theme handled automatically by shared system
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('About page loaded - theme handled by shared system');
-    });
-
-    function navigateToUrl(url) {
-      if (window.navigateFromNova) {
-        window.navigateFromNova(url);
-      } else {
-        window.location.href = url;
-      }
-    }
-
-    // Make back link functional
-    document.querySelector('.back-link').addEventListener('click', function(e) {
-      e.preventDefault();
-      navigateToUrl('nova://home');
+    // Setup back link using shared function
+    document.addEventListener('DOMContentLoaded', () => {
+      window.setupBackLink();
     });
   </script>
 </body>

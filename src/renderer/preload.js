@@ -1,15 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('🚀 [Preload] Nova preload script starting with contextBridge...');
-console.log('🚀 [Preload] Running in:', window === window.parent ? 'Main Window' : 'Webview/Frame');
-console.log('🚀 [Preload] Current URL:', window.location?.href || 'unknown');
-
 // Track pending requests
 const pendingRequests = new Map();
 
-// Handle responses from webview.send() (when sent from renderer via webview.send)
+// Handle responses from webview.send()
 if (window !== window.parent) {
-  // In webview context, listen for messages sent via webview.send()
+  // listen for messages sent via webview.send()
   ipcRenderer.on('settings-response', (event, response) => {
     const { requestId, success, data, error } = response;
     
@@ -26,19 +22,16 @@ if (window !== window.parent) {
   });
 }
 
-// Helper function to send settings requests via IPC
+// Send settings requests via IPC
 function sendSettingsRequest(action, data = {}) {
   return new Promise((resolve, reject) => {
     const requestId = Math.random().toString(36).substr(2, 9);
     const channel = 'settings-request';
     
-    // Check if we're in a webview or main window
     const isWebview = window !== window.parent;
     
-    // Store the promise handlers
     pendingRequests.set(requestId, { resolve, reject });
     
-    // Send the request
     const request = {
       requestId,
       action,
@@ -47,7 +40,7 @@ function sendSettingsRequest(action, data = {}) {
     
     try {
       if (isWebview) {
-        // In webview, send to host (renderer process)
+        // In webview, send to host
         ipcRenderer.sendToHost(channel, request);
       } else {
         // In main window, send to main process
@@ -78,7 +71,6 @@ function sendSettingsRequest(action, data = {}) {
       reject(error);
     }
     
-    // Timeout after 5 seconds
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
         pendingRequests.delete(requestId);
@@ -88,9 +80,8 @@ function sendSettingsRequest(action, data = {}) {
   });
 }
 
-// Expose secure API to renderer via contextBridge
+// Expose API to renderer
 contextBridge.exposeInMainWorld('novaAPI', {
-  // Settings API - via IPC communication
   settings: {
     get: async (key, defaultValue) => {
       try {
@@ -105,7 +96,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
     set: async (key, value) => {
       try {
         await sendSettingsRequest('set', { key, value });
-        console.log(`[NovaAPI] Settings set: ${key} = ${value}`);
         return true;
       } catch (error) {
         console.error('[NovaAPI] Settings set failed:', error);
@@ -126,7 +116,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
     setMultiple: async (settings) => {
       try {
         await sendSettingsRequest('setMultiple', { settings });
-        console.log(`[NovaAPI] Settings setMultiple: ${Object.keys(settings).length} settings`);
         return true;
       } catch (error) {
         console.error('[NovaAPI] Settings setMultiple failed:', error);
@@ -137,7 +126,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
     remove: async (key) => {
       try {
         await sendSettingsRequest('remove', { key });
-        console.log(`[NovaAPI] Settings remove: ${key}`);
         return true;
       } catch (error) {
         console.error('[NovaAPI] Settings remove failed:', error);
@@ -158,7 +146,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
     clear: async () => {
       try {
         await sendSettingsRequest('clear');
-        console.log('[NovaAPI] Settings cleared');
         return true;
       } catch (error) {
         console.error('[NovaAPI] Settings clear failed:', error);
@@ -166,7 +153,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
       }
     },
     
-    // Convenience methods
     getHomepage: async () => {
       try {
         const result = await sendSettingsRequest('get', { key: 'homepage', defaultValue: 'nova://home' });
@@ -212,10 +198,9 @@ contextBridge.exposeInMainWorld('novaAPI', {
     }
   },
   
-  // IPC API for renderer communication
+  // IPC API
   ipc: {
     send: (channel, ...args) => {
-      // Whitelist allowed channels for security
       const validChannels = ['close-window', 'open-nova-url'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, ...args);
@@ -245,9 +230,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
 });
 
 
-// Also expose a simplified settings helper
 contextBridge.exposeInMainWorld('novaSettings', {
-  // Core API methods - via IPC communication
   get: async (key, defaultValue = null) => {
     try {
       const result = await sendSettingsRequest('get', { key, defaultValue });
@@ -261,7 +244,6 @@ contextBridge.exposeInMainWorld('novaSettings', {
   set: async (key, value) => {
     try {
       await sendSettingsRequest('set', { key, value });
-      console.log(`[NovaSettings] set: ${key} = ${value}`);
       return true;
     } catch (error) {
       console.error('[NovaSettings] set failed:', error);
@@ -282,7 +264,6 @@ contextBridge.exposeInMainWorld('novaSettings', {
   setMultiple: async (settings) => {
     try {
       await sendSettingsRequest('setMultiple', { settings });
-      console.log(`[NovaSettings] setMultiple: ${Object.keys(settings).length} settings`);
       return true;
     } catch (error) {
       console.error('[NovaSettings] setMultiple failed:', error);
@@ -293,7 +274,6 @@ contextBridge.exposeInMainWorld('novaSettings', {
   clear: async () => {
     try {
       await sendSettingsRequest('clear');
-      console.log('[NovaSettings] cleared');
       return true;
     } catch (error) {
       console.error('[NovaSettings] clear failed:', error);
@@ -314,7 +294,6 @@ contextBridge.exposeInMainWorld('novaSettings', {
   remove: async (key) => {
     try {
       await sendSettingsRequest('remove', { key });
-      console.log(`[NovaSettings] remove: ${key}`);
       return true;
     } catch (error) {
       console.error('[NovaSettings] remove failed:', error);
@@ -422,10 +401,3 @@ contextBridge.exposeInMainWorld('novaSettings', {
   isInitialized: () => true,
   ready: () => true
 });
-
-console.log('🚀 [Preload] Nova API exposed via contextBridge');
-console.log('🚀 [Preload] NovaSettings exposed via contextBridge');
-console.log('🚀 [Preload] Settings communication: IPC-based');
-console.log('🚀 [Preload] Context:', window === window.parent ? 'Main Window' : 'Webview/Frame');
-console.log('🚀 [Preload] Current URL:', window.location.href);
-console.log('🚀 [Preload] If you see these 🚀 messages, the preload script is working!');

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>Nova Browser - History</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -79,15 +80,15 @@
   <a href="nova://home" class="back-link">← Back to Home</a>
   <div class="container">
     <h1>Browsing History</h1>
-    <div class="history-item" onclick="navigateToUrl('https://google.com')">
-      <div class="history-favicon">🌐</div>
+    <div class="history-item" onclick="window.navigateToUrl('https://google.com')">
+      <div class="history-favicon">🔍</div>
       <div class="history-info">
         <div class="history-title">Google</div>
         <div class="history-url">https://google.com</div>
       </div>
       <div class="history-time">2 hours ago</div>
     </div>
-    <div class="history-item" onclick="navigateToUrl('https://github.com')">
+    <div class="history-item" onclick="window.navigateToUrl('https://github.com')">
       <div class="history-favicon">🐙</div>
       <div class="history-info">
         <div class="history-title">GitHub</div>
@@ -95,7 +96,7 @@
       </div>
       <div class="history-time">1 day ago</div>
     </div>
-    <div class="history-item" onclick="navigateToUrl('nova://home')">
+    <div class="history-item" onclick="window.navigateToUrl('nova://home')">
       <div class="history-favicon">🌟</div>
       <div class="history-info">
         <div class="history-title">Nova Browser - Home</div>
@@ -109,19 +110,6 @@
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    // History page - theme handled automatically by shared system
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('History page loaded - theme handled by shared system');
-    });
-
-    function navigateToUrl(url) {
-      if (window.navigateFromNova) {
-        window.navigateFromNova(url);
-      } else {
-        window.location.href = url;
-      }
-    }
-
     function clearHistory() {
       if (confirm('Are you sure you want to clear all browsing history?')) {
         // Hide all history items
@@ -144,9 +132,8 @@
     }
 
     // Make back link functional
-    document.querySelector('.back-link').addEventListener('click', function(e) {
-      e.preventDefault();
-      navigateToUrl('nova://home');
+    document.addEventListener('DOMContentLoaded', () => {
+      window.setupBackLink();
     });
   </script>
 </body>

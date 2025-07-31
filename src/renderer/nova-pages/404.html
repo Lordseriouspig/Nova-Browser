@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>Page Not Found - Nova Browser</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -63,11 +64,5 @@
   </div>
 
   <script src="nova://shared/theme.js"></script>
-  <script>
-    // 404 page - theme handled automatically by shared system
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('404 page loaded - theme handled by shared system');
-    });
-  </script>
 </body>
 </html>

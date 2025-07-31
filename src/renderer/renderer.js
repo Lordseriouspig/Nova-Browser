@@ -1,26 +1,20 @@
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Nova Renderer] DOM loaded, checking for novaAPI...');
   
   // Check if contextBridge API is available
   if (typeof window.novaAPI === 'undefined') {
-    console.error('[Nova Renderer] ❌ novaAPI not available - preload script may have failed');
+    console.error('[Nova Renderer] novaAPI not available - preload script may have failed');
     return;
   }
   
-  console.log('[Nova Renderer] ✅ novaAPI available, initializing browser...');
-  
   // Get references to the settings helper (contextBridge version)
   const novaSettings = window.novaAPI.settings;
-  console.log('[Nova Renderer] Settings API ready:', window.novaAPI.system.isReady());
 
-  // Setup IPC listener for nova:// URLs from main process
+  // Setup IPC listener for nova:// URLs
   if (window.novaAPI.ipc) {
     window.novaAPI.ipc.on('open-nova-url', (event, url) => {
-      console.log('[Nova Renderer] 🔥 Received nova:// URL:', url);
       const activeWebview = getActiveWebview();
       if (activeWebview) {
-        // Extract page name from nova:// URL
         const page = url.replace('nova://', '');
         handleNovaPage(page, activeWebview);
         document.getElementById('url').value = url;
@@ -28,15 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Setup IPC listener for settings on webview elements
+  // Setup IPC listener for settings
   const setupWebviewListener = (webview) => {
-    console.log('[Nova Renderer] Setting up IPC listener for webview:', webview);
     
-    webview.addEventListener('ipc-message', async (event) => {
-      console.log('[Nova Renderer] 🔥 Received IPC message on channel:', event.channel, 'args:', event.args);
-      
+    webview.addEventListener('ipc-message', async (event) => {  
       if (event.channel === 'settings-request') {
-        console.log('[Nova Renderer] Processing settings request:', event.args[0]);
         const { requestId, action, ...data } = event.args[0];
         let success = true;
         let result, error;
@@ -76,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
           success = false;
           error = err.message;
         }
-        console.log('[Nova Renderer] Sending IPC response:', { requestId, success, data: result, error });
         webview.send('settings-response', { requestId, success, data: result, error });
       }
     });
@@ -95,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const goBtn = document.getElementById('go');
   const urlInput = document.getElementById('url');
 
-  let tabCount = 1; // Start from 1 since tab-0 already exists
+  let tabCount = 1;
 
   // Get the current active webview
   function getActiveWebview() {
@@ -105,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update URL input from webview's current URL
   function updateUrlFromWebview(webview) {
     if (webview && webview.classList.contains('active')) {
-      // Check if this is a nova page
       if (webview.dataset.novaUrl) {
         urlInput.value = webview.dataset.novaUrl;
       } else {
@@ -113,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const currentUrl = webview.getURL();
           urlInput.value = currentUrl;
         } catch (error) {
-          console.log('Could not get webview URL:', error);
+          console.info('Could not get webview URL:', error);
         }
       }
     }
@@ -122,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize the first tab click handler and add close button
   const firstTab = document.querySelector('.tab[data-id="tab-0"]');
   if (firstTab) {
-    // Add close button to the first tab
     addCloseButtonToTab(firstTab, 'tab-0');
     
     firstTab.addEventListener('click', () => {
@@ -135,8 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview) {
       let url = urlInput.value;
-      
-      // Handle nova:// internal pages
       if (url.startsWith('nova://')) {
         await handleNovaPage(url, activeWebview);
         return;
@@ -144,8 +129,33 @@ document.addEventListener('DOMContentLoaded', () => {
       
       let regex = /^(https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.[a-z]{2,})(\/[^\s]*)?$/i; // Regex pattern to match URLs
       if (!regex.test(url)) {
-        // If not a URL, treat as a Google search
-        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+        // If not a URL, treat as a search query using the default search engine
+        try {
+          let searchEngine = 'Google';
+          if (novaSettings) {
+            searchEngine = await novaSettings.get('search-engine', 'Google');
+          }
+          
+          // Build search URL based on engine
+          switch (searchEngine) {
+            case 'Bing':
+              url = 'https://www.bing.com/search?q=' + encodeURIComponent(url);
+              break;
+            case 'DuckDuckGo':
+              url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
+              break;
+            case 'Yahoo':
+              url = 'https://search.yahoo.com/search?p=' + encodeURIComponent(url);
+              break;
+            case 'Google':
+            default:
+              url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+              break;
+          }
+        } catch (error) {
+          console.warn('Could not get search engine setting, using Google:', error);
+          url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+        }
       } else {
         if (!url.startsWith('http')) url = 'https://' + url;
       }
@@ -164,8 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview && activeWebview.canGoBack()) {
       activeWebview.goBack();
-      
-      // Force URL update after navigation
+
       setTimeout(() => {
         updateUrlFromWebview(activeWebview);
       }, 100);
@@ -177,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeWebview && activeWebview.canGoForward()) {
       activeWebview.goForward();
       
-      // Force URL update after navigation  
       setTimeout(() => {
         updateUrlFromWebview(activeWebview);
       }, 100);
@@ -187,31 +195,28 @@ document.addEventListener('DOMContentLoaded', () => {
   reloadBtn.addEventListener('click', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview) {
-      // Add loading class for continuous spinning
       reloadBtn.classList.add('loading');
       
       activeWebview.reload();
     }
   });
 
-  // Add keyboard shortcuts for webview dev tools
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
-    // F12 or Ctrl+Shift+I to open dev tools for active webview
     if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
       e.preventDefault();
       const activeWebview = getActiveWebview();
       if (activeWebview) {
-        console.log('[Nova] Opening dev tools for active webview');
+        console.debug('[Nova] Opening dev tools for active webview');
         activeWebview.openDevTools();
       }
     }
     
-    // Ctrl+R or F5 to reload active webview
     if ((e.ctrlKey && e.key === 'r') || e.key === 'F5') {
       e.preventDefault();
       const activeWebview = getActiveWebview();
       if (activeWebview) {
-        console.log('[Nova] Reloading active webview');
+        console.debug('[Nova] Reloading active webview');
         reloadBtn.classList.add('loading');
         activeWebview.reload();
       }
@@ -222,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
   devToolsBtn.addEventListener('click', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview) {
-      console.log('[Nova] Opening dev tools for active webview via button');
       activeWebview.openDevTools();
     }
   });
@@ -236,47 +240,34 @@ document.addEventListener('DOMContentLoaded', () => {
       page = page.slice(0, -1);
     }
     
-    // If page is empty after removing slash, default to 'home'
     if (page === '') {
       page = 'home';
     }
     
-    // Store the original nova URL on the webview element
     webview.dataset.novaUrl = url;
     
     await loadNovaPage(page, webview);
   }
 
-  // Load nova page from HTML file - automatically finds any page file
   async function loadNovaPage(page, webview) {
     try {
-      console.log('[Nova Renderer] 🔧 Loading nova:// page:', page);
-      
-      const preloadPath = './preload.js'; // Relative path - works because webviews resolve relative to renderer
-      console.log('[Nova Renderer] 🔧 Setting up webview for nova:// page:', page);
-      console.log('[Nova Renderer] 🔧 Preload path:', preloadPath);
+      const preloadPath = './preload.js';
       webview.setAttribute('preload', preloadPath);
-      webview.setAttribute('nodeIntegration', '');
       
-      // Set up listeners BEFORE loading content
       setupWebviewListener(webview);
       setupWebviewEvents(webview);
-      
-      // Load directly as nova:// URL instead of data URL to trigger preload script
+
       const novaUrl = `nova://${page}`;
-      console.log('[Nova Renderer] � Loading nova URL directly:', novaUrl);
       
-      // Wait for webview to be ready for new content
       return new Promise((resolve, reject) => {
         const loadHandler = () => {
-          console.log('[Nova Renderer] ✅ Webview loaded successfully for:', page);
           webview.removeEventListener('dom-ready', loadHandler);
           webview.removeEventListener('did-fail-load', errorHandler);
           resolve();
         };
         
         const errorHandler = (event) => {
-          console.error('[Nova Renderer] ❌ Webview failed to load:', page, event);
+          console.error('[Nova Renderer] Webview failed to load:', page, event);
           webview.removeEventListener('dom-ready', loadHandler);
           webview.removeEventListener('did-fail-load', errorHandler);
           reject(new Error(`Failed to load nova:// page: ${page}`));
@@ -285,81 +276,37 @@ document.addEventListener('DOMContentLoaded', () => {
         webview.addEventListener('dom-ready', loadHandler);
         webview.addEventListener('did-fail-load', errorHandler);
         
-        // Load the nova:// URL directly - this will trigger preload script
         webview.loadURL(novaUrl);
       });
     } catch (error) {
       console.error('Error loading nova page:', error);
-      // Fallback: try loading with data URL approach
-      await loadNovaPageFallback(page, webview);
+      await load404Page(page, webview);;
     }
-  }
-
-  // Fallback method using data URLs (without preload script)
-  async function loadNovaPageFallback(page, webview) {
-    // This fallback is no longer needed since nova:// protocol is handled by main process
-    console.warn('[Nova Renderer] Fallback loading should not be needed with nova:// protocol');
-    console.warn('[Nova Renderer] If you see this, there may be an issue with the nova:// protocol handler');
-    
-    // Load 404 page instead
-    await load404Page(page, webview);
-  }
-
-  // Replace placeholders in HTML content
-  function replacePlaceholders(htmlContent, page) {
-    return htmlContent
-      .replace(/\{\{PAGE\}\}/g, page)
-      .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
-      .replace(/\{\{VERSION\}\}/g, '1.0.0');
   }
 
   // Load 404 page with page name
   async function load404Page(page, webview) {
     // With nova:// protocol, we can just load the 404 page directly
-    console.log(`[Nova Renderer] Loading 404 page for: ${page}`);
+    console.debug(`[Nova Renderer] Loading 404 page for: ${page}`);
     webview.src = 'nova://404';
-  }
-
-  // Fallback 404 page if file loading fails
-  function generateFallback404(page) {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Error - Nova Browser</title>
-        <style>
-          body { font-family: sans-serif; text-align: center; padding: 40px; background: #f5f5f5; }
-          h1 { color: #e74c3c; }
-        </style>
-      </head>
-      <body>
-        <h1>Error</h1>
-        <p>Could not load nova://${page}</p>
-        <p><a href="nova://home">Go to Nova Home</a></p>
-      </body>
-      </html>
-    `;
   }
 
   // Generate home page content for new tabs
   async function generateHomePage() {
-    // Get the homepage from settings
     try {
       if (window.novaSettings) {
         const homepage = await window.novaSettings.get('homepage', 'nova://home');
         return homepage;
       }
     } catch (error) {
-      console.log('Could not get homepage from settings, using default:', error);
+      console.info('Could not get homepage from settings, using default:', error);
     }
     
-    // Fallback to default
     return 'nova://home';
   }
 
   // Helper function to add close button to a tab
   function addCloseButtonToTab(tabButton, tabId) {
-    // Check if close button already exists
     if (tabButton.querySelector('.tab-close')) {
       return;
     }
@@ -377,16 +324,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup webview events
   function setupWebviewEvents(webview) {
     webview.addEventListener('did-start-loading', () => {
-      // Only show loading spinner if it was triggered by refresh button
-      // The loading class will already be present if refresh was clicked
     });
 
     webview.addEventListener('did-stop-loading', () => {
-      // Remove loading animation when page finishes loading
       if (webview.classList.contains('active')) {
         reloadBtn.classList.remove('loading');
         
-        // Update URL bar with nova URL if it's a nova page
         if (webview.dataset.novaUrl) {
           urlInput.value = webview.dataset.novaUrl;
         }
@@ -395,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     webview.addEventListener('did-navigate', (event) => {
       if (webview.classList.contains('active')) {
-        // Check if this is a nova page
         if (webview.dataset.novaUrl) {
           urlInput.value = webview.dataset.novaUrl;
         } else {
@@ -406,7 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     webview.addEventListener('did-navigate-in-page', (event) => {
       if (webview.classList.contains('active')) {
-        // Check if this is a nova page
         if (webview.dataset.novaUrl) {
           urlInput.value = webview.dataset.novaUrl;
         } else {
@@ -419,7 +360,6 @@ document.addEventListener('DOMContentLoaded', () => {
     webview.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       
-      // Create context menu
       const contextMenu = document.createElement('div');
       contextMenu.className = 'webview-context-menu';
       contextMenu.style.cssText = `
@@ -437,7 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
         font-size: 13px;
       `;
       
-      // Add menu items
       const devToolsItem = document.createElement('div');
       devToolsItem.textContent = 'Inspect Element';
       devToolsItem.style.cssText = `
@@ -477,7 +416,6 @@ document.addEventListener('DOMContentLoaded', () => {
       contextMenu.appendChild(reloadItem);
       document.body.appendChild(contextMenu);
       
-      // Remove context menu when clicking elsewhere
       const removeMenu = (e) => {
         if (!contextMenu.contains(e.target)) {
           document.body.removeChild(contextMenu);
@@ -491,19 +429,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const tabId = webview.dataset.id;
       const tabButton = document.querySelector(`.tab[data-id="${tabId}"]`);
       if (tabButton) {
-        // Find and preserve the close button
         const closeBtn = tabButton.querySelector('.tab-close');
         
-        // Update the text content while preserving the close button
         const title = event.title || 'New Tab';
         
         if (closeBtn) {
-          // Remove close button temporarily, update text, then re-add it
           closeBtn.remove();
           tabButton.innerText = title;
           tabButton.appendChild(closeBtn);
         } else {
-          // If no close button exists, just update the text
           tabButton.innerText = title;
         }
       }
@@ -511,23 +445,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle messages from nova pages
     webview.addEventListener('ipc-message', async (event) => {
-      console.log('[Nova Renderer] Received IPC message:', event.channel, event.args);
       
       if (event.channel === 'navigate') {
         const url = event.args[0];
         if (url.startsWith('nova://')) {
           await handleNovaPage(url, webview);
         } else {
-          // Clear nova URL data when navigating to external sites
           delete webview.dataset.novaUrl;
           webview.src = url;
         }
-        // Update URL bar
         if (webview.classList.contains('active')) {
           urlInput.value = url;
         }
       } else if (event.channel === 'nova-settings-request') {
-        // Handle settings requests from nova pages
         const { action, data, id } = event.args[0];
         
         try {
@@ -587,18 +517,14 @@ document.addEventListener('DOMContentLoaded', () => {
   async function initializeFirstTab() {
     const initialWebview = document.querySelector('.tab-view[data-id="tab-0"]');
     if (initialWebview) {
-      // Set correct preload path for initial webview BEFORE setting src
-      const preloadPath = './preload.js'; // Relative path works for webviews
-      console.log('[Nova Renderer] Setting preload path for initial webview:', preloadPath);
+      const preloadPath = './preload.js';
       initialWebview.setAttribute('preload', preloadPath);
       
-      // Get homepage from settings and set it
       const homepageUrl = await generateHomePage();
       initialWebview.src = homepageUrl;
       
       setupWebviewListener(initialWebview);
       setupWebviewEvents(initialWebview);
-      // Set initial URL in the input
       urlInput.value = homepageUrl;
     }
   }
@@ -610,56 +536,43 @@ document.addEventListener('DOMContentLoaded', () => {
   newTabBtn.addEventListener('click', async () => {
     const tabId = `tab-${tabCount++}`;
 
-    // Create tab button
     const tabButton = document.createElement('button');
     tabButton.className = 'tab';
     tabButton.innerText = 'New Tab';
     tabButton.dataset.id = tabId;
 
-    // Create webview
     const webview = document.createElement('webview');
-    webview.src = await generateHomePage(); // Now properly awaited
+    webview.src = await generateHomePage();
     webview.className = 'tab-view';
     webview.dataset.id = tabId;
-    const preloadPath = './preload.js'; // Relative path works for webviews
-    console.log('[Nova Renderer] Setting preload path for new webview:', preloadPath);
+    const preloadPath = './preload.js';
     webview.setAttribute('preload', preloadPath);
 
-    // Setup events for the new webview
     setupWebviewListener(webview);
     setupWebviewEvents(webview);
 
-    // Add click handler for the tab
     tabButton.addEventListener('click', () => {
       activateTab(tabId);
     });
 
-    // Add close button to tab
     addCloseButtonToTab(tabButton, tabId);
 
-    // Add to DOM
     tabsContainer.insertBefore(tabButton, newTabBtn);
     webviewsContainer.appendChild(webview);
-
-    // Activate the new tab
     activateTab(tabId);
   });
 
   function activateTab(tabId) {
-    // Update tab buttons
     document.querySelectorAll('.tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.id === tabId);
     });
 
-    // Update webviews
     document.querySelectorAll('.tab-view').forEach(view => {
       view.classList.toggle('active', view.dataset.id === tabId);
     });
 
-    // Update URL input with current webview URL
     const activeWebview = getActiveWebview();
     if (activeWebview) {
-      // Check if this is a nova page first
       if (activeWebview.dataset.novaUrl) {
         urlInput.value = activeWebview.dataset.novaUrl;
       } else {
@@ -683,11 +596,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabButton && webview) {
       const wasActive = tabButton.classList.contains('active');
       
-      // Remove elements
       tabButton.remove();
       webview.remove();
       
-      // If we closed the active tab, activate another one
       if (wasActive) {
         const remainingTabs = document.querySelectorAll('.tab[data-id]');
         if (remainingTabs.length > 0) {
@@ -698,25 +609,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initialize theme system
   initializeThemeSystem();
 });
 
 // Theme system initialization
 function initializeThemeSystem() {
-  console.log('[Nova Renderer] Initializing theme system...');
+  console.debug('[Nova Renderer] Initializing theme system...');
   
-  // Load theme from settings and apply to main window
   loadThemeFromSettings();
   
-  // Listen for theme changes from Nova pages
   window.addEventListener('storage', (e) => {
     if (e.key === 'nova-theme') {
       applyThemeToMainWindow(e.newValue);
     }
   });
   
-  // Listen for theme changes from webviews via postMessage
   window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'nova-theme-changed') {
       applyThemeToMainWindow(event.data.theme);
@@ -733,11 +640,10 @@ async function loadThemeFromSettings() {
       const theme = darkMode ? 'dark' : 'light';
       applyThemeToMainWindow(theme);
       localStorage.setItem('nova-theme', theme);
-      console.log('[Nova Renderer] Theme loaded from settings:', theme);
+      console.debug('[Nova Renderer] Theme loaded from settings:', theme);
     }
   } catch (error) {
     console.error('[Nova Renderer] Failed to load theme from settings:', error);
-    // Fallback to localStorage
     const savedTheme = localStorage.getItem('nova-theme') || 'dark';
     applyThemeToMainWindow(savedTheme);
   }
@@ -752,5 +658,5 @@ function applyThemeToMainWindow(theme) {
     html.setAttribute('data-theme', 'light');
   }
   
-  console.log('[Nova Renderer] Applied theme to main window:', theme);
+  console.debug('[Nova Renderer] Applied theme to main window:', theme);
 }

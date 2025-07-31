@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Initialize electron-store in main process for IPC communication
+// Initialize electron-store
 const Store = require('electron-store');
 const settingsStore = new Store({
   name: 'nova-settings',
@@ -76,28 +76,22 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient('nova');
 }
 
-// This duplicate registration is removed - protocol registration happens in the main app.whenReady() below
-
-// Prevent multiple instances - always use existing window
+// Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  // If we didn't get the lock, quit immediately without showing any window
   app.quit();
 } else {
   // Handle nova:// protocol on Windows/Linux
   app.on('second-instance', (event, commandLine, workingDirectory) => {
-    // Someone tried to run a second instance, focus our window instead and handle the protocol
     const mainWindow = BrowserWindow.getAllWindows()[0];
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
-      mainWindow.show(); // Ensure window is visible
+      mainWindow.show();
       
-      // Find nova:// URL in command line arguments
       const novaUrl = commandLine.find(arg => arg.startsWith('nova://'));
       if (novaUrl) {
-        // Small delay to ensure window is ready
         setTimeout(() => {
           mainWindow.webContents.send('open-nova-url', novaUrl);
         }, 100);
@@ -105,7 +99,7 @@ if (!gotTheLock) {
     }
   });
 
-  // Handle nova:// protocol on macOS
+  // Handle nova:// protocol on mac
   app.on('open-url', (event, url) => {
     event.preventDefault();
     if (url.startsWith('nova://')) {
@@ -113,9 +107,8 @@ if (!gotTheLock) {
       if (mainWindow) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
-        mainWindow.show(); // Ensure window is visible
+        mainWindow.show();
         
-        // Small delay to ensure window is ready
         setTimeout(() => {
           mainWindow.webContents.send('open-nova-url', url);
         }, 100);
@@ -124,32 +117,27 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // Register protocol first, then create window
-    protocol.registerStringProtocol('nova', (request, callback) => {
+    // Register nova:// protocol
+    protocol.registerStringProtocol('nova', (request, callback) => { // TODO: Replace with a non-deprecated method
       const url = new URL(request.url);
-      console.log('[Nova Protocol] Full URL:', request.url);
-      console.log('[Nova Protocol] Parsed - hostname:', url.hostname, 'pathname:', url.pathname);
       
-      // For nova://shared/theme.css, hostname="shared" and pathname="/theme.css"
-      // We need to combine them properly
       let page;
       if (url.hostname && url.pathname && url.pathname !== '/') {
-        page = url.hostname + url.pathname; // "shared/theme.css"
+        page = url.hostname + url.pathname;
       } else {
-        page = url.hostname; // Just "home" for nova://home
+        page = url.hostname;
       }
       
-      console.log('[Nova Protocol] Handling nova:// request for page:', page);
+      console.debug('[Nova Protocol] Handling nova:// request for page:', page);
       
       try {
         // Check if it's a CSS or JS file
         if (page.endsWith('.css')) {
           const cssPath = path.join(__dirname, '../renderer/nova-pages', page);
-          console.log('[Nova Protocol] Looking for CSS at:', cssPath);
           
           if (fs.existsSync(cssPath)) {
             const cssContent = fs.readFileSync(cssPath, 'utf8');
-            console.log('[Nova Protocol] ✅ Successfully loaded CSS:', page);
+            console.debug('[Nova Protocol] Loaded CSS:', page);
             callback({ data: cssContent, mimeType: 'text/css' });
             return;
           }
@@ -157,11 +145,10 @@ if (!gotTheLock) {
         
         if (page.endsWith('.js')) {
           const jsPath = path.join(__dirname, '../renderer/nova-pages', page);
-          console.log('[Nova Protocol] Looking for JS at:', jsPath);
           
           if (fs.existsSync(jsPath)) {
             const jsContent = fs.readFileSync(jsPath, 'utf8');
-            console.log('[Nova Protocol] ✅ Successfully loaded JS:', page);
+            console.debug('[Nova Protocol] Loaded JS:', page);
             callback({ data: jsContent, mimeType: 'application/javascript' });
             return;
           }
@@ -169,7 +156,6 @@ if (!gotTheLock) {
         
         // Handle HTML pages
         const novaPagePath = path.join(__dirname, '../renderer/nova-pages', `${page}.html`);
-        console.log('[Nova Protocol] Looking for page at:', novaPagePath);
         
         if (fs.existsSync(novaPagePath)) {
           let htmlContent = fs.readFileSync(novaPagePath, 'utf8');
@@ -180,7 +166,7 @@ if (!gotTheLock) {
             .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
             .replace(/\{\{VERSION\}\}/g, '1.0.0');
           
-          console.log('[Nova Protocol] ✅ Successfully loaded nova:// page:', page);
+          console.debug('[Nova Protocol] Loaded nova:// page:', page);
           callback({ data: htmlContent, mimeType: 'text/html' });
         } else {
           // Load 404 page
@@ -188,7 +174,7 @@ if (!gotTheLock) {
           if (fs.existsSync(notFoundPath)) {
             let htmlContent = fs.readFileSync(notFoundPath, 'utf8');
             htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, page);
-            console.log('[Nova Protocol] 📄 Loaded 404 page for:', page);
+            console.debug('[Nova Protocol] Loaded 404 page for:', page);
             callback({ data: htmlContent, mimeType: 'text/html' });
           } else {
             // Fallback 404
@@ -203,12 +189,11 @@ if (!gotTheLock) {
               </body>
               </html>
             `;
-            console.log('[Nova Protocol] 🔄 Using fallback 404 for:', page);
             callback({ data: fallback404, mimeType: 'text/html' });
           }
         }
       } catch (error) {
-        console.error('[Nova Protocol] ❌ Error handling nova:// request:', error);
+        console.error('[Nova Protocol] Error handling nova:// request:', error);
         callback({ error: error.code || -6 });
       }
     });
@@ -225,18 +210,15 @@ function createWindow() {
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, '../renderer/preload.js'),
-      nodeIntegration: false,       // Secure: no Node.js in renderer
-      contextIsolation: true,       // Secure: isolated contexts
-      webviewTag: true,             // Enable webview for website content
-      enableRemoteModule: false,     // Additional security
+      nodeIntegration: false,
+      contextIsolation: true,
+      webviewTag: true,
+      enableRemoteModule: false,
       sandbox: false
     }
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
-
-  // Open DevTools for debugging (remove this in production)
-  mainWindow.webContents.openDevTools();
 
   // Handle nova:// URL if app was launched with one
   const novaUrl = process.argv.find(arg => arg.startsWith('nova://'));
@@ -262,23 +244,20 @@ app.on('window-all-closed', () => {
 // Handle clearing browsing data on exit
 app.on('before-quit', async (event) => {
   try {
-    // Check if clear data on exit is enabled
     const clearDataOnExit = await settingsStore.get('clear-data', false);
     if (clearDataOnExit) {
-      console.log('[Nova Main] Clearing browsing data on exit...');
+      console.debug('[Nova Main] Clearing browsing data...');
       
-      // Clear session data
       const session = require('electron').session.defaultSession;
       
-      // Clear cache, cookies, and storage data
       await session.clearCache();
       await session.clearStorageData({
         storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers']
       });
       
-      console.log('[Nova Main] ✅ Browsing data cleared successfully');
+      console.debug('[Nova Main] Browsing data cleared');
     }
   } catch (error) {
-    console.error('[Nova Main] ❌ Error clearing browsing data:', error);
+    console.error('[Nova Main] Error clearing browsing data:', error);
   }
 });

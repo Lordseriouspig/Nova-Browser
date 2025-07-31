@@ -31,22 +31,22 @@
     "electron-store": "^8.0.0"
   },
   "build": {
-  "appId": "com.novabrowser.app",
-  "productName": "Nova Browser",
-  "protocols": [
-    {
-      "name": "nova",
-      "schemes": ["nova"]
+    "appId": "com.novabrowser.app",
+    "productName": "Nova Browser",
+    "protocols": [
+      {
+        "name": "nova",
+        "schemes": ["nova"]
+      }
+    ],
+    "win": {
+      "icon": "assets/icon/icon-win.ico"
+    },
+    "mac": {
+      "icon": "assets/icon/icon-mac.icns"
+    },
+    "linux": {
+      "icon": "assets/icon/icon-linux.png"
     }
-  ],
-  "win": {
-    "icon": "assets/icon/icon-win.ico"
-  },
-  "mac": {
-    "icon": "assets/icon/icon-mac.icns"
-  },
-  "linux": {
-    "icon": "assets/icon/icon-linux.png"
   }
-}
 }

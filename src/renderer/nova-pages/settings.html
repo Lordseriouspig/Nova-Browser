@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>Nova Browser - Settings</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
     :root {
-      /* Light theme (default) */
+      /* Light theme */
       --bg-primary: #f5f5f5;
       --bg-secondary: #ffffff;
       --text-primary: #333333;
@@ -281,40 +282,11 @@
   <script>
     let NovaSettings;
 
-    // Apply saved theme immediately on page load (before settings system loads)
-    function applyStoredTheme() {
-      // The shared theme system handles this automatically
-      if (window.NovaTheme) {
-        console.log('Theme system initialized:', window.NovaTheme.getCurrentTheme());
-      }
-    }
-
-    // Apply theme when page loads - now just wait for theme system
-    document.addEventListener('DOMContentLoaded', function() {
-      applyStoredTheme();
-    });
-
-    // Debug what's available on window
-    console.log('Window objects after script load:', {
-      novaSettings: !!window.novaSettings,
-      novaAPI: !!window.novaAPI,
-      windowKeys: Object.keys(window).filter(k => k.includes('ova'))
-    });
-
-    // Use the contextBridge exposed novaSettings
     if (window.novaSettings) {
       NovaSettings = window.novaSettings;
-      console.log('Using contextBridge novaSettings, store type:', NovaSettings.getStoreType());
+      console.debug('Using contextBridge novaSettings, store type:', NovaSettings.getStoreType());
     } else {
       console.error('window.novaSettings not available - contextBridge may not be working');
-    }
-
-    function navigateToUrl(url) {
-      if (window.navigateFromNova) {
-        window.navigateFromNova(url);
-      } else {
-        window.location.href = url;
-      }
     }
 
     async function saveSettings() {
@@ -361,7 +333,7 @@
         try {
           const result = await NovaSettings.resetAll();
           if (result) {
-            await loadSettings(); // Reload the form
+            await loadSettings();
             alert('Settings reset to defaults!');
           } else {
             alert('Failed to reset settings. Please try again.');
@@ -375,35 +347,33 @@
 
     async function loadSettings() {
       if (!NovaSettings) {
-        console.log('Settings system not ready, trying again...');
+        console.info('Settings system not ready, trying again...');
         setTimeout(loadSettings, 100);
         return;
       }
 
       try {
-        console.log('Loading settings with store type:', NovaSettings.getStoreType());
+        console.debug('Loading settings with store type:', NovaSettings.getStoreType());
         
-        // Load individual settings (async)
+        // Load individual settings
         document.getElementById('homepage').value = await NovaSettings.get('homepage', 'nova://home');
         document.getElementById('search-engine').value = await NovaSettings.get('search-engine', 'Google');
         document.getElementById('clear-data').checked = await NovaSettings.get('clear-data', false);
         document.getElementById('dark-mode').checked = await NovaSettings.get('dark-mode', false);
         document.getElementById('bookmarks-bar').checked = await NovaSettings.get('bookmarks-bar', true);
         
-        console.log('Settings loaded successfully');
+        console.debug('Settings loaded successfully');
         
-        // Apply current theme
         await applyTheme();
         
       } catch (error) {
         console.error('Error loading settings:', error);
-        // Fall back to defaults if loading fails
         document.getElementById('homepage').value = 'nova://home';
         document.getElementById('search-engine').value = 'Google';
         document.getElementById('clear-data').checked = false;
         document.getElementById('dark-mode').checked = false;
         document.getElementById('bookmarks-bar').checked = true;
-        console.log('Loaded default settings due to error');
+        console.info('Loaded default settings due to error');
       }
     }
 
@@ -414,12 +384,10 @@
         const darkMode = await NovaSettings.get('dark-mode', false);
         const themePreview = document.getElementById('theme-preview');
         
-        // Check if the shared theme system is available
+        // Check if the theme system is available
         if (window.NovaTheme && window.NovaTheme.setTheme) {
-          // Use the shared theme system
           await window.NovaTheme.setTheme(darkMode ? 'dark' : 'light');
         } else {
-          // Fallback: apply theme directly to document
           console.warn('NovaTheme not available, applying theme directly');
           const html = document.documentElement;
           if (darkMode) {
@@ -444,12 +412,9 @@
       const darkModeToggle = document.getElementById('dark-mode');
       if (darkModeToggle) {
         darkModeToggle.addEventListener('change', async function() {
-          // Check if the shared theme system is available
           if (window.NovaTheme && window.NovaTheme.setTheme) {
-            // Update theme immediately using shared system
             await window.NovaTheme.setTheme(this.checked ? 'dark' : 'light');
           } else {
-            // Fallback: apply theme directly
             console.warn('NovaTheme not available, applying theme directly');
             const html = document.documentElement;
             if (this.checked) {
@@ -475,7 +440,6 @@
         if (!NovaSettings) {
           console.error('Settings system not available - contextBridge may not be working');
           alert('Settings system failed to load. Some features may not work properly.');
-          // Set defaults
           setTimeout(() => {
             document.getElementById('homepage').value = 'nova://home';
             document.getElementById('search-engine').value = 'Google';
@@ -486,13 +450,11 @@
           return;
         }
         
-        console.log('Settings system initialized:', NovaSettings.getStoreType());
-        console.log('Settings ready:', NovaSettings.ready());
+        console.debug('Settings system initialized:', NovaSettings.getStoreType());
+        console.debug('Settings ready:', NovaSettings.ready());
         
-        // Load settings once initialized
         await loadSettings();
         
-        // Set up theme change listener
         setupThemeListener();
         
       } catch (error) {
@@ -504,7 +466,7 @@
     // Make back link functional
     document.querySelector('.back-link').addEventListener('click', function(e) {
       e.preventDefault();
-      navigateToUrl('nova://home');
+      window.navigateToUrl('nova://home');
     });
 
     // Initialize when page loads

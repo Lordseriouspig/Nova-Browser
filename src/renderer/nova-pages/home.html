@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
   <title>Nova Browser - Home</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -137,43 +138,28 @@
     
     <div class="quick-links">
       <div class="link-card" onclick="navigateToUrl('https://google.com')">
-        🔍 Google Search
+        Google Search
       </div>
       <div class="link-card" onclick="navigateToUrl('https://github.com')">
-        🐙 GitHub
+        GitHub
       </div>
       <div class="link-card" onclick="navigateToUrl('nova://settings')">
-        ⚙️ Browser Settings
+        Browser Settings
       </div>
       <div class="link-card" onclick="navigateToUrl('nova://about')">
-        ℹ️ About Nova
+        About Nova
       </div>
       <div class="link-card" onclick="navigateToUrl('nova://history')">
-        📜 Browse History
+        Browse History
       </div>
       <div class="link-card" onclick="navigateToUrl('nova://bookmarks')">
-        📚 Bookmarks
+        Bookmarks
       </div>
     </div>
   </div>
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    // Home page - theme handled automatically by shared system
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('Home page loaded - theme handled by shared system');
-    });
-
-    function navigateToUrl(url) {
-      // Use the preload script function if available
-      if (window.navigateFromNova) {
-        window.navigateFromNova(url);
-      } else {
-        // Fallback: try to navigate directly
-        window.location.href = url;
-      }
-    }
-
     async function performSearch() {
       const searchTerm = document.getElementById('homeSearch').value;
       if (searchTerm.trim()) {
@@ -190,7 +176,7 @@
           }
         } else {
           // Get search engine from settings
-          let searchEngine = 'Google'; // Default fallback
+          let searchEngine = 'Google';
           try {
             if (window.NovaSettings) {
               searchEngine = await window.NovaSettings.get('search-engine', 'Google');
@@ -214,7 +200,7 @@
           }
         }
         
-        navigateToUrl(url);
+        window.navigateToUrl(url);
       }
     }
 
