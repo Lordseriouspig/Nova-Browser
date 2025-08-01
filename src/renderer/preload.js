@@ -1,25 +1,37 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Increase max listeners to prevent warnings
+ipcRenderer.setMaxListeners(20);
+
 // Track pending requests
 const pendingRequests = new Map();
 
-// Handle responses from webview.send()
-if (window !== window.parent) {
-  // listen for messages sent via webview.send()
-  ipcRenderer.on('settings-response', (event, response) => {
-    const { requestId, success, data, error } = response;
-    
-    if (pendingRequests.has(requestId)) {
-      const { resolve, reject } = pendingRequests.get(requestId);
-      pendingRequests.delete(requestId);
+// Set up a single persistent listener for settings responses
+let settingsResponseListenerSetup = false;
+
+function setupSettingsResponseListener() {
+  if (!settingsResponseListenerSetup) {
+    ipcRenderer.on('settings-response', (event, response) => {
+      const { requestId, success, data, error } = response;
       
-      if (success) {
-        resolve(data);
-      } else {
-        reject(new Error(error || 'Settings request failed'));
+      if (pendingRequests.has(requestId)) {
+        const { resolve, reject } = pendingRequests.get(requestId);
+        pendingRequests.delete(requestId);
+        
+        if (success) {
+          resolve(data);
+        } else {
+          reject(new Error(error || 'Settings request failed'));
+        }
       }
-    }
-  });
+    });
+    settingsResponseListenerSetup = true;
+  }
+}
+
+// Initialize the listener for webviews
+if (window !== window.parent) {
+  setupSettingsResponseListener();
 }
 
 // Send settings requests via IPC
@@ -43,27 +55,11 @@ function sendSettingsRequest(action, data = {}) {
         // In webview, send to host
         ipcRenderer.sendToHost(channel, request);
       } else {
-        // In main window, send to main process
+        // In main window, set up the persistent listener if not already done
+        setupSettingsResponseListener();
+        
+        // Send to main process
         ipcRenderer.send(channel, request);
-        
-        // For main window, set up a one-time listener
-        const responseHandler = (event, response) => {
-          if (response.requestId === requestId) {
-            ipcRenderer.removeListener('settings-response', responseHandler);
-            if (pendingRequests.has(requestId)) {
-              const { resolve, reject } = pendingRequests.get(requestId);
-              pendingRequests.delete(requestId);
-              
-              if (response.success) {
-                resolve(response.data);
-              } else {
-                reject(new Error(response.error || 'Settings request failed'));
-              }
-            }
-          }
-        };
-        
-        ipcRenderer.on('settings-response', responseHandler);
       }
     } catch (error) {
       console.error('[Preload] Failed to send settings request:', error);

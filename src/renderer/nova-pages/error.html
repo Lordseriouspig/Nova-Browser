@@ -147,7 +147,7 @@
   </style>
 </head>
 <body>
-  <a href="javascript:history.back()" class="back-link">← Back</a>
+  <a href="javascript:goHome()" class="back-link">🏠 Home</a>
   <div class="container">
     <div class="icon" id="error-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></div>
     <h1 id="error-title">Error</h1>
@@ -168,7 +168,7 @@
     
     <div class="retry-actions">
       <button class="retry-btn" onclick="retryPage()">Refresh</button>
-      <button class="retry-btn secondary" onclick="goBack()">← Go Back</button>
+      <button class="retry-btn secondary" onclick="goHome()">Go Home</button>
     </div>
   </div>
 
@@ -595,30 +595,45 @@
 
     function retryPage() {
       const { url } = getUrlParams();
+      console.log('[Error Page] Retry page called with URL:', url);
+      console.log('[Error Page] Nova API available:', !!window.novaAPI);
+      console.log('[Error Page] Navigation API available:', !!(window.novaAPI && window.novaAPI.navigation));
+      
       if (url && url !== 'unknown') {
-        if (window.novaAPI && window.novaAPI.ipc) {
-          window.novaAPI.ipc.send('navigate', decodeURIComponent(url));
-        } else if (window.navigateToUrl) {
-          window.navigateToUrl(decodeURIComponent(url));
+        const decodedUrl = decodeURIComponent(url);
+        console.log('[Error Page] Attempting to navigate to:', decodedUrl);
+        
+        // Use the nova API navigation function
+        if (window.novaAPI && window.novaAPI.navigation) {
+          console.log('[Error Page] Using nova API navigation');
+          window.novaAPI.navigation.goTo(decodedUrl);
+        } else if (window.parent && window.parent.navigateFromNova) {
+          console.log('[Error Page] Using parent navigateFromNova');
+          window.parent.navigateFromNova(decodedUrl);
+        } else if (window.navigateFromNova) {
+          console.log('[Error Page] Using local navigateFromNova');
+          window.navigateFromNova(decodedUrl);
         } else {
-          window.location.href = decodeURIComponent(url);
+          console.log('[Error Page] Using direct navigation');
+          // For direct navigation, force a fresh load
+          window.location.href = decodedUrl;
         }
       } else {
+        console.log('[Error Page] Reloading current page');
         window.location.reload();
       }
     }
 
-    function goBack() {
-      if (window.history.length > 1) {
-        window.history.back();
+    function goHome() {
+      // Navigate to home page using the nova API
+      if (window.novaAPI && window.novaAPI.navigation) {
+        window.novaAPI.navigation.goTo('nova://home');
+      } else if (window.parent && window.parent.navigateFromNova) {
+        window.parent.navigateFromNova('nova://home');
+      } else if (window.navigateFromNova) {
+        window.navigateFromNova('nova://home');
       } else {
-        if (window.novaAPI && window.novaAPI.ipc) {
-          window.novaAPI.ipc.send('navigate', 'nova://home');
-        } else if (window.navigateToUrl) {
-          window.navigateToUrl('nova://home');
-        } else {
-          window.location.href = 'nova://home';
-        }
+        window.location.href = 'nova://home';
       }
     }
 
