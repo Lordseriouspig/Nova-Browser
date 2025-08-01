@@ -15,7 +15,7 @@ module.exports = {
       config: {
         iconUrl: 'https://raw.githubusercontent.com/Lordseriouspig/Nova-Browser/main/assets/icon/icon-win.ico',
         setupIcon: './assets/icon/icon-win.ico',
-        loadingGif: './assets/icon/icon-win.ico',
+        loadingGif: './assets/banner.png',
       },
     },
     {
