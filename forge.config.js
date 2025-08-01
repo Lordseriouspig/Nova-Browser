@@ -4,24 +4,46 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './assets/icon/icon', // Electron will automatically append the correct extension
+    name: 'Nova Browser',
+    executableName: 'nova-browser',
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        iconUrl: 'https://raw.githubusercontent.com/Lordseriouspig/Nova-Browser/main/assets/icon/icon-win.ico',
+        setupIcon: './assets/icon/icon-win.ico',
+        loadingGif: './assets/icon/icon-win.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
+      config: {
+        icon: './assets/icon/icon-mac.icns',
+      },
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          icon: './assets/icon/icon-linux.png',
+          maintainer: 'Lordseriouspig',
+          homepage: 'https://github.com/Lordseriouspig/Nova-Browser',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: './assets/icon/icon-linux.png',
+          maintainer: 'Lordseriouspig',
+          homepage: 'https://github.com/Lordseriouspig/Nova-Browser',
+        },
+      },
     },
   ],
   plugins: [
