@@ -28,6 +28,7 @@
     "electron": "^37.2.4"
   },
   "dependencies": {
+    "@sentry/electron": "^5.12.0",
     "electron-store": "^8.0.0"
   },
   "build": {
@@ -36,7 +37,9 @@
     "protocols": [
       {
         "name": "nova",
-        "schemes": ["nova"]
+        "schemes": [
+          "nova"
+        ]
       }
     ],
     "win": {

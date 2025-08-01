@@ -10,19 +10,42 @@ class NovaTheme {
 
   // Initialize theme system
   init() {
-
     this.applyStoredTheme();
     
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'nova-theme') {
-        this.applyTheme(e.newValue);
-      }
-    });
+    // Only add storage listener if localStorage is available
+    if (this.isLocalStorageAvailable()) {
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'nova-theme') {
+          this.applyTheme(e.newValue);
+        }
+      });
+    }
+  }
+
+  // Check if localStorage is available
+  isLocalStorageAvailable() {
+    try {
+      const test = '__nova_test__';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   // Apply theme from localStorage or Nova settings
   async applyStoredTheme() {
-    const savedTheme = localStorage.getItem('nova-theme');
+    let savedTheme = null;
+    
+    // Try to get theme from localStorage if available
+    if (this.isLocalStorageAvailable()) {
+      try {
+        savedTheme = localStorage.getItem('nova-theme');
+      } catch (error) {
+        console.warn('[Nova Theme] localStorage access denied:', error.message);
+      }
+    }
     
     let themeToApply = 'dark';
     
@@ -67,7 +90,14 @@ class NovaTheme {
     
     this.applyTheme(newTheme);
     
-    localStorage.setItem('nova-theme', newTheme);
+    // Save to localStorage if available
+    if (this.isLocalStorageAvailable()) {
+      try {
+        localStorage.setItem('nova-theme', newTheme);
+      } catch (error) {
+        console.warn('[Nova Theme] Could not save to localStorage:', error.message);
+      }
+    }
     
 
     if (window.novaSettings) {
@@ -124,7 +154,15 @@ class NovaTheme {
     }
     
     this.applyTheme(theme);
-    localStorage.setItem('nova-theme', theme);
+    
+    // Save to localStorage if available
+    if (this.isLocalStorageAvailable()) {
+      try {
+        localStorage.setItem('nova-theme', theme);
+      } catch (error) {
+        console.warn('[Nova Theme] Could not save to localStorage:', error.message);
+      }
+    }
     
     if (window.novaSettings) {
       try {
@@ -138,7 +176,14 @@ class NovaTheme {
   }
 
   async resetToDefaultTheme() {
-    localStorage.removeItem('nova-theme');
+    // Remove from localStorage if available
+    if (this.isLocalStorageAvailable()) {
+      try {
+        localStorage.removeItem('nova-theme');
+      } catch (error) {
+        console.warn('[Nova Theme] Could not remove from localStorage:', error.message);
+      }
+    }
     
     this.applyTheme('dark');
     
@@ -161,7 +206,16 @@ class NovaTheme {
         const darkMode = await window.novaSettings.get('dark-mode', false);
         const theme = darkMode ? 'dark' : 'light';
         this.applyTheme(theme);
-        localStorage.setItem('nova-theme', theme);
+        
+        // Save to localStorage if available
+        if (this.isLocalStorageAvailable()) {
+          try {
+            localStorage.setItem('nova-theme', theme);
+          } catch (error) {
+            console.warn('[Nova Theme] Could not save to localStorage:', error.message);
+          }
+        }
+        
         return theme;
       } catch (error) {
         console.error('Failed to load theme from settings:', error);

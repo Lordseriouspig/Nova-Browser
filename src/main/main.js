@@ -2,6 +2,16 @@ const { app, BrowserWindow, ipcMain, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Initialize Sentry for main process error tracking
+const Sentry = require("@sentry/electron/main");
+Sentry.init({
+  dsn: "https://ebf0e69b9cea5c343f5b90005b9f214c@o4509766495043584.ingest.de.sentry.io/4509766498713680",
+  environment: process.env.NODE_ENV || 'development',
+  integrations: [
+    // Add any specific integrations you need
+  ],
+});
+
 // Initialize electron-store
 const Store = require('electron-store');
 const settingsStore = new Store({
@@ -74,6 +84,35 @@ ipcMain.on('refresh-bookmarks-bar', (event) => {
   allWindows.forEach(window => {
     window.webContents.send('refresh-bookmarks-bar');
   });
+});
+
+// IPC handler for testing Sentry (development only)
+ipcMain.on('test-sentry', (event, testType) => {
+  console.log('[Nova Main] Testing Sentry with test type:', testType);
+  
+  try {
+    switch (testType) {
+      case 'js-error':
+        // Test JavaScript error
+        Sentry.captureException(new Error('Test JavaScript error from main process'));
+        console.log('[Nova Main] Sentry JavaScript error test sent');
+        break;
+      case 'js-crash':
+        // Test undefined function call
+        myUndefinedFunction();
+        break;
+      case 'native-crash':
+        // Test native crash (uncomment only for testing)
+        // process.crash();
+        break;
+      default:
+        Sentry.captureMessage('Sentry test message from main process', 'info');
+        console.log('[Nova Main] Sentry test message sent');
+    }
+  } catch (error) {
+    Sentry.captureException(error);
+    console.error('[Nova Main] Sentry test error:', error);
+  }
 });
 
 // Register as default protocol handler for nova://
