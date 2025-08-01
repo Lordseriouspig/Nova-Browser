@@ -3,13 +3,12 @@ Yet another electron-based browser, Nova browser is designed to be an all-in-one
 
 ## Installation
 
-### Option 1: Pre-built (Recommended)
+### Option 1: Pre-built (Recommended) (Windows Only)
 Visit the [Releases](https://github.com/Lordseriouspig/Nova-Browser/releases) page to download the latest version for your platform:
 - **Windows**: Download the `.exe` installer
-- **macOS**: Download the `.dmg` file
-- **Linux**: Download the `.deb` (Debian/Ubuntu) or `.rpm` (Red Hat/Fedora) package
 
-### Option 2: Build from Source
+### Option 2: Build from Source (All platforms)
+If you are on Mac or Linux, you will have to build from the source.
 
 #### Prerequisites
 - [Node.js](https://nodejs.org/) (v16 or higher)
