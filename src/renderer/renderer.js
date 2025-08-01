@@ -1,3 +1,21 @@
+// Initialize Sentry for renderer process error tracking
+let Sentry = null;
+try {
+  Sentry = require("@sentry/electron/renderer");
+  Sentry.init({
+    dsn: "https://ebf0e69b9cea5c343f5b90005b9f214c@o4509766495043584.ingest.de.sentry.io/4509766498713680",
+    environment: process.env.NODE_ENV || 'development',
+  });
+  console.log('[Nova Renderer] Sentry initialized successfully');
+} catch (error) {
+  console.warn('[Nova Renderer] Sentry initialization failed:', error.message);
+  // Create a mock Sentry object to prevent errors
+  Sentry = {
+    captureException: (error) => console.error('[Nova Renderer] Error (Sentry disabled):', error),
+    captureMessage: (message, level) => console.log(`[Nova Renderer] Message (Sentry disabled):`, message)
+  };
+}
+
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
   

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova: https: http:; font-src 'self' nova:;">
   <title>Nova Browser - Home</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -36,6 +36,17 @@
       transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
     }
 
+    /* Global scrollbar hiding */
+    * {
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* Internet Explorer 10+ */
+    }
+
+    /* Hide scrollbar for webkit browsers globally */
+    *::-webkit-scrollbar {
+      display: none;
+    }
+
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg-gradient);
@@ -44,6 +55,234 @@
       text-align: center; 
       color: var(--text-primary);
       min-height: 100vh;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      /* Hide scrollbar for webkit browsers */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* Internet Explorer 10+ */
+    }
+
+    /* Hide scrollbar for webkit browsers (Chrome, Safari, Edge) */
+    body::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Custom background overlay */
+    body.has-custom-bg::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.3);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* Customize button */
+    .customize-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 10px 15px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 0.9em;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .customize-btn svg {
+      width: 1em;
+      height: 1em;
+      flex-shrink: 0;
+    }
+
+    .customize-btn:hover {
+      background: var(--card-bg-hover);
+      transform: scale(1.05);
+    }
+
+    /* Customization Modal */
+    .customize-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .customize-modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 15px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.2);
+      /* Hide scrollbar for modal */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* Internet Explorer 10+ */
+    }
+
+    /* Hide scrollbar for webkit browsers in modal */
+    .modal-content::-webkit-scrollbar {
+      display: none;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .modal-title {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: var(--text-primary);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.5em;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 50%;
+      width: 35px;
+      height: 35px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s ease;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: rgba(255,255,255,0.6);
+    }
+
+    .quick-links-editor {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 15px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .quick-link-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .quick-link-item input {
+      flex: 1;
+      margin: 0;
+    }
+
+    .remove-link-btn {
+      background: #ff4444;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+
+    .add-link-btn {
+      background: #4CAF50;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      padding: 10px 15px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 25px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     
     .container { 
@@ -124,42 +363,331 @@
       background: var(--card-bg-hover);
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
+
+    /* Background Image Options */
+    .background-image-options {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .image-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .image-option input[type="radio"] {
+      margin: 0;
+      width: auto;
+    }
+
+    .image-option label {
+      margin: 0;
+      font-weight: normal;
+      min-width: 80px;
+    }
+
+    .image-option input[type="url"] {
+      flex: 1;
+      margin: 0;
+    }
+
+    .upload-btn {
+      background: #4CAF50;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .upload-btn:hover {
+      background: #45a049;
+    }
+
+    .upload-filename {
+      color: rgba(255,255,255,0.8);
+      font-size: 0.8em;
+      margin-left: 10px;
+    }
+
+    .image-preview-container {
+      margin-top: 10px;
+    }
+
+    .image-preview {
+      display: none;
+      max-width: 200px;
+      max-height: 100px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    .form-helper-text {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8em;
+      margin-top: 5px;
+      display: block;
+    }
+
+    .input-group {
+      margin-top: 10px;
+    }
+
+    .input-group.hidden {
+      display: none;
+    }
+
+    .input-group input[type="url"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
+  <button class="customize-btn" onclick="openCustomizeModal()"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-paintbrush-icon lucide-paintbrush"><path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/></svg> Customize</button>
+  
   <div class="container">
-    <h1>Welcome to Nova Browser</h1>
-    <p>Your gateway to the web</p>
+    <h1 id="homeTitle">Welcome to Nova Browser</h1>
+    <p id="homeSubtitle">Your gateway to the web</p>
     
     <div class="search-box">
       <input type="text" id="homeSearch" placeholder="Search or enter URL..." />
       <button onclick="performSearch()">Search</button>
     </div>
     
-    <div class="quick-links">
-      <div class="link-card" onclick="navigateToUrl('https://google.com')">
-        Google Search
+    <div class="quick-links" id="quickLinks">
+      <!-- Quick links will be dynamically loaded -->
+    </div>
+  </div>
+
+  <!-- Customization Modal -->
+  <div class="customize-modal" id="customizeModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Customize Home Page</h2>
+        <button class="close-btn" onclick="closeCustomizeModal()">&times;</button>
       </div>
-      <div class="link-card" onclick="navigateToUrl('https://github.com')">
-        GitHub
+      
+      <div class="form-group">
+        <label for="homePageTitle">Page Title</label>
+        <input type="text" id="homePageTitle" placeholder="Welcome to Nova Browser">
       </div>
-      <div class="link-card" onclick="navigateToUrl('nova://settings')">
-        Browser Settings
+      
+      <div class="form-group">
+        <label for="homePageSubtitle">Subtitle</label>
+        <input type="text" id="homePageSubtitle" placeholder="Your gateway to the web">
       </div>
-      <div class="link-card" onclick="navigateToUrl('nova://about')">
-        About Nova
+      
+      <div class="form-group">
+        <label>Background Image</label>
+        <div class="background-image-options">
+          <div class="image-option">
+            <input type="radio" id="imageUrl" name="backgroundType" value="url" checked>
+            <label for="imageUrl">Image URL</label>
+          </div>
+          <div class="image-option">
+            <input type="radio" id="imageUpload" name="backgroundType" value="upload">
+            <label for="imageUpload">Upload Image</label>
+          </div>
+        </div>
+        
+        <!-- URL Input (shown by default) -->
+        <div id="urlInputGroup" class="input-group">
+          <input type="url" id="backgroundImage" placeholder="https://example.com/image.jpg">
+        </div>
+        
+        <!-- Upload Input (hidden by default) -->
+        <div id="uploadInputGroup" class="input-group hidden">
+          <input type="file" id="backgroundImageFile" accept="image/*" class="file-input-hidden">
+          <button type="button" class="upload-btn" onclick="document.getElementById('backgroundImageFile').click()">
+            Choose File
+          </button>
+          <span id="uploadFileName" class="upload-filename"></span>
+        </div>
+        
+        <div class="image-preview-container">
+          <img id="imagePreview" class="image-preview" alt="Image preview">
+        </div>
+        <small class="form-helper-text">
+          Leave empty to use default background
+        </small>
       </div>
-      <div class="link-card" onclick="navigateToUrl('nova://history')">
-        Browse History
+      
+      <div class="form-group">
+        <label>Quick Links</label>
+        <div class="quick-links-editor" id="quickLinksEditor">
+          <!-- Quick links editor will be dynamically populated -->
+        </div>
+        <button class="add-link-btn" onclick="addQuickLink()">+ Add Link</button>
       </div>
-      <div class="link-card" onclick="navigateToUrl('nova://bookmarks')">
-        Bookmarks
+      
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="resetToDefaults()">Reset to Defaults</button>
+        <button class="btn btn-primary" onclick="saveCustomization()">Save Changes</button>
       </div>
     </div>
   </div>
 
   <script src="nova://shared/theme.js"></script>
   <script>
+    // Default configuration
+    const DEFAULT_CONFIG = {
+      title: 'Welcome to Nova Browser',
+      subtitle: 'Your gateway to the web',
+      backgroundImage: '',
+      backgroundType: 'url', // 'url' or 'upload'
+      quickLinks: [
+        { name: 'Google Search', url: 'https://google.com' },
+        { name: 'GitHub', url: 'https://github.com' },
+        { name: 'Browser Settings', url: 'nova://settings' },
+        { name: 'About Nova', url: 'nova://about' },
+        { name: 'Browse History', url: 'nova://history' },
+        { name: 'Bookmarks', url: 'nova://bookmarks' }
+      ]
+    };
+
+    let currentConfig = { ...DEFAULT_CONFIG };
+
+    // Initialize page
+    async function initializePage() {
+      await loadCustomization();
+      applyCustomization();
+      setupEventListeners();
+    }
+
+    // Load customization from settings
+    async function loadCustomization() {
+      try {
+        if (window.novaAPI && window.novaAPI.settings) {
+          const savedConfig = await window.novaAPI.settings.get('home-customization', DEFAULT_CONFIG);
+          currentConfig = { ...DEFAULT_CONFIG, ...savedConfig };
+        }
+      } catch (error) {
+        console.warn('Could not load home customization:', error);
+        currentConfig = { ...DEFAULT_CONFIG };
+      }
+    }
+
+    // Apply customization to the page
+    function applyCustomization() {
+      // Apply title and subtitle
+      document.getElementById('homeTitle').textContent = currentConfig.title;
+      document.getElementById('homeSubtitle').textContent = currentConfig.subtitle;
+
+      // Apply background image
+      if (currentConfig.backgroundImage) {
+        document.body.style.backgroundImage = `url('${currentConfig.backgroundImage}')`;
+        document.body.classList.add('has-custom-bg');
+      } else {
+        document.body.style.backgroundImage = '';
+        document.body.classList.remove('has-custom-bg');
+      }
+
+      // Apply quick links
+      renderQuickLinks();
+    }
+
+    // Render quick links
+    function renderQuickLinks() {
+      const container = document.getElementById('quickLinks');
+      container.innerHTML = '';
+
+      currentConfig.quickLinks.forEach(link => {
+        const linkElement = document.createElement('div');
+        linkElement.className = 'link-card';
+        linkElement.textContent = link.name;
+        linkElement.onclick = () => navigateToUrl(link.url);
+        container.appendChild(linkElement);
+      });
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+      // Allow Enter key in search box
+      document.getElementById('homeSearch').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+
+      // Close modal when clicking outside
+      document.getElementById('customizeModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+          closeCustomizeModal();
+        }
+      });
+
+      // Handle background type radio buttons
+      document.querySelectorAll('input[name="backgroundType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          toggleBackgroundInput(this.value);
+        });
+      });
+
+      // Handle file selection
+      document.getElementById('backgroundImageFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const fileNameSpan = document.getElementById('uploadFileName');
+        
+        if (file) {
+          fileNameSpan.textContent = file.name;
+          // Convert file to data URL for preview and storage
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const imagePreview = document.getElementById('imagePreview');
+            if (imagePreview) {
+              imagePreview.src = e.target.result;
+              imagePreview.style.display = 'block';
+            }
+          };
+          reader.readAsDataURL(file);
+        } else {
+          fileNameSpan.textContent = '';
+          const imagePreview = document.getElementById('imagePreview');
+          if (imagePreview) {
+            imagePreview.style.display = 'none';
+          }
+        }
+      });
+    }
+
+    // Function to toggle background input fields visibility
+    function toggleBackgroundInput(type) {
+      const urlInputGroup = document.getElementById('urlInputGroup');
+      const uploadInputGroup = document.getElementById('uploadInputGroup');
+      const imagePreview = document.getElementById('imagePreview');
+      
+      if (type === 'url') {
+        // Show URL input, hide upload elements
+        urlInputGroup.classList.remove('hidden');
+        uploadInputGroup.classList.add('hidden');
+        if (imagePreview) {
+          imagePreview.style.display = 'none';
+        }
+      } else if (type === 'upload') {
+        // Hide URL input, show upload elements
+        urlInputGroup.classList.add('hidden');
+        uploadInputGroup.classList.remove('hidden');
+      }
+    }
+
+    // Search functionality
     async function performSearch() {
       const searchTerm = document.getElementById('homeSearch').value;
       if (searchTerm.trim()) {
@@ -178,8 +706,8 @@
           // Get search engine from settings
           let searchEngine = 'Google';
           try {
-            if (window.NovaSettings) {
-              searchEngine = await window.NovaSettings.get('search-engine', 'Google');
+            if (window.novaAPI && window.novaAPI.settings) {
+              searchEngine = await window.novaAPI.settings.get('search-engine', 'Google');
             }
           } catch (error) {
             console.warn('Could not get search engine setting, using Google:', error);
@@ -200,16 +728,174 @@
           }
         }
         
-        window.navigateToUrl(url);
+        navigateToUrl(url);
       }
     }
 
-    // Allow Enter key in search box
-    document.getElementById('homeSearch').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        performSearch();
+    // Navigation function (global scope for onclick handlers)
+    window.navigateToUrl = function(url) {
+      if (window.novaAPI && window.novaAPI.navigation) {
+        window.novaAPI.navigation.goTo(url);
+      } else if (window.parent && window.parent.navigateFromNova) {
+        window.parent.navigateFromNova(url);
+      } else {
+        window.location.href = url;
       }
-    });
+    };
+
+    // Navigation function (for internal use)
+    function navigateToUrl(url) {
+      window.navigateToUrl(url);
+    }
+
+    // Customization Modal Functions
+    function openCustomizeModal() {
+      populateModalFields();
+      document.getElementById('customizeModal').classList.add('show');
+    }
+
+    function closeCustomizeModal() {
+      document.getElementById('customizeModal').classList.remove('show');
+    }
+
+    function populateModalFields() {
+      document.getElementById('homePageTitle').value = currentConfig.title;
+      document.getElementById('homePageSubtitle').value = currentConfig.subtitle;
+      
+      // Set background type and image
+      const backgroundTypeRadios = document.querySelectorAll('input[name="backgroundType"]');
+      backgroundTypeRadios.forEach(radio => {
+        radio.checked = radio.value === (currentConfig.backgroundType || 'url');
+      });
+      
+      // Populate background image based on type
+      if (currentConfig.backgroundType === 'url' || !currentConfig.backgroundType) {
+        document.getElementById('backgroundImage').value = currentConfig.backgroundImage || '';
+      } else if (currentConfig.backgroundType === 'upload' && currentConfig.backgroundImage) {
+        // For uploaded images, show a preview
+        const imagePreview = document.getElementById('imagePreview');
+        if (imagePreview) {
+          imagePreview.src = currentConfig.backgroundImage;
+          imagePreview.style.display = 'block';
+        }
+      }
+      
+      // Show/hide background input fields based on type
+      toggleBackgroundInput(currentConfig.backgroundType || 'url');
+      
+      // Populate quick links editor
+      renderQuickLinksEditor();
+    }
+
+    function renderQuickLinksEditor() {
+      const container = document.getElementById('quickLinksEditor');
+      container.innerHTML = '';
+
+      currentConfig.quickLinks.forEach((link, index) => {
+        const linkItem = document.createElement('div');
+        linkItem.className = 'quick-link-item';
+        linkItem.innerHTML = `
+          <input type="text" placeholder="Link Name" value="${link.name}" onchange="updateQuickLink(${index}, 'name', this.value)">
+          <input type="url" placeholder="https://example.com" value="${link.url}" onchange="updateQuickLink(${index}, 'url', this.value)">
+          <button class="remove-link-btn" onclick="removeQuickLink(${index})">Remove</button>
+        `;
+        container.appendChild(linkItem);
+      });
+    }
+
+    function updateQuickLink(index, field, value) {
+      if (currentConfig.quickLinks[index]) {
+        currentConfig.quickLinks[index][field] = value;
+      }
+    }
+
+    function addQuickLink() {
+      currentConfig.quickLinks.push({ name: 'New Link', url: 'https://example.com' });
+      renderQuickLinksEditor();
+    }
+
+    function removeQuickLink(index) {
+      currentConfig.quickLinks.splice(index, 1);
+      renderQuickLinksEditor();
+    }
+
+    async function saveCustomization() {
+      // Get values from modal fields
+      currentConfig.title = document.getElementById('homePageTitle').value || DEFAULT_CONFIG.title;
+      currentConfig.subtitle = document.getElementById('homePageSubtitle').value || DEFAULT_CONFIG.subtitle;
+      
+      // Get background type
+      const backgroundTypeRadio = document.querySelector('input[name="backgroundType"]:checked');
+      currentConfig.backgroundType = backgroundTypeRadio ? backgroundTypeRadio.value : 'url';
+      
+      // Get background image based on type
+      if (currentConfig.backgroundType === 'url') {
+        currentConfig.backgroundImage = document.getElementById('backgroundImage').value || '';
+      } else if (currentConfig.backgroundType === 'upload') {
+        // Keep the uploaded image data URL if it exists
+        const imagePreview = document.getElementById('imagePreview');
+        if (imagePreview && imagePreview.src && imagePreview.src.startsWith('data:')) {
+          currentConfig.backgroundImage = imagePreview.src;
+        } else {
+          currentConfig.backgroundImage = '';
+        }
+      }
+
+      try {
+        // Save to settings
+        if (window.novaAPI && window.novaAPI.settings) {
+          await window.novaAPI.settings.set('home-customization', currentConfig);
+        }
+
+        // Apply changes immediately
+        applyCustomization();
+        closeCustomizeModal();
+
+        // Show success feedback
+        showNotification('Customization saved successfully!', 'success');
+      } catch (error) {
+        console.error('Failed to save customization:', error);
+        showNotification('Failed to save customization. Please try again.', 'error');
+      }
+    }
+
+    function resetToDefaults() {
+      if (confirm('Are you sure you want to reset to default settings? This will remove all your customizations.')) {
+        currentConfig = { ...DEFAULT_CONFIG };
+        populateModalFields();
+        saveCustomization();
+      }
+    }
+
+    function showNotification(message, type) {
+      // Create notification element
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        z-index: 3000;
+        font-size: 0.9em;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      // Remove notification after 3 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 3000);
+    }
+
+    // Initialize page when DOM is loaded
+    document.addEventListener('DOMContentLoaded', initializePage);
   </script>
 </body>
 </html>
