@@ -162,7 +162,7 @@ if (!gotTheLock) {
       
       // Whitelist of allowed pages/files to further restrict access
       const allowedPages = [
-        'home', 'about', 'settings', 'bookmarks', 'history', 'test', '404',
+        'home', 'about', 'settings', 'bookmarks', 'history', 'test', '404', 'error',
         'shared/theme.css', 'shared/theme.js'
       ];
       
@@ -174,11 +174,23 @@ if (!gotTheLock) {
       
       if (!isAllowed) {
         console.warn('[Nova Protocol] Page not in allowlist:', sanitizedPage);
-        // Load 404 page for unauthorized access attempts
-        const notFoundPath = path.join(__dirname, '../renderer/nova-pages', '404.html');
-        if (fs.existsSync(notFoundPath)) {
-          let htmlContent = fs.readFileSync(notFoundPath, 'utf8');
-          htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, sanitizedPage);
+        // Load error page for unauthorized access attempts
+        const errorPagePath = path.join(__dirname, '../renderer/nova-pages', 'error.html');
+        if (fs.existsSync(errorPagePath)) {
+          let htmlContent = fs.readFileSync(errorPagePath, 'utf8');
+          // Inject error parameters directly into the HTML
+          const errorParams = {
+            code: 'nova-404',
+            url: encodeURIComponent('nova://' + sanitizedPage),
+            message: encodeURIComponent('Nova page not found')
+          };
+          const errorScript = `
+            <script>
+              // Override URL parameters for error page
+              window.location.search = '?code=${errorParams.code}&url=${errorParams.url}&message=${errorParams.message}';
+            </script>
+          `;
+          htmlContent = htmlContent.replace('</head>', errorScript + '</head>');
           callback({ data: htmlContent, mimeType: 'text/html' });
         } else {
           callback({ error: -6 });

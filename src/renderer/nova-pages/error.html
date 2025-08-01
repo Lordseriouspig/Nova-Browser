@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
+  <title>Error - Nova Browser</title>
+  <link rel="stylesheet" href="nova://shared/theme.css">
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      margin: 0; padding: 40px; text-align: center; 
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+    }
+    .container { 
+      max-width: 600px; margin: 0 auto; 
+      background: var(--bg-secondary); 
+      padding: 40px; border-radius: 10px; 
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-light);
+    }
+    h1 { 
+      color: var(--accent-color); 
+      font-size: 2.5em; margin-bottom: 10px; 
+    }
+    h2 { 
+      color: var(--text-primary); 
+      margin-bottom: 20px; 
+      font-size: 1.5em;
+    }
+    p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin: 15px 0;
+    }
+    .error-code { 
+      color: var(--text-primary); 
+      padding: 8px 0; 
+      font-family: 'Consolas', 'Monaco', monospace; 
+      display: inline-block;
+      margin: 10px 0;
+      font-size: 0.9em;
+      text-transform: uppercase;
+    }
+    .error-url {
+      color: var(--text-secondary); 
+      padding: 8px 0; 
+      font-family: 'Consolas', 'Monaco', monospace; 
+      display: block;
+      margin: 15px 0;
+      word-break: break-all;
+      font-size: 0.85em;
+    }
+    .links { 
+      margin-top: 30px; 
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .links a { 
+      color: var(--accent-color); 
+      text-decoration: none; 
+      padding: 10px 20px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      font-weight: 500;
+    }
+    .links a:hover { 
+      background: var(--accent-color);
+      color: white;
+      text-decoration: none; 
+    }
+    .icon { 
+      font-size: 4em; 
+      margin-bottom: 20px; 
+      opacity: 0.8;
+    }
+    .icon svg {
+      width: 64px;
+      height: 64px;
+    }
+    .error-details {
+      text-align: left;
+      background: var(--bg-tertiary);
+      padding: 20px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border: 1px solid var(--border-light);
+    }
+    .error-details h3 {
+      color: var(--text-primary);
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+    }
+    .error-details ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    .error-details li {
+      color: var(--text-secondary);
+      margin: 5px 0;
+      line-height: 1.5;
+    }
+    .retry-btn {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin: 10px 5px;
+    }
+    .retry-btn:hover {
+      background: var(--accent-hover);
+    }
+    .retry-btn.secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+    .retry-btn.secondary:hover {
+      background: var(--bg-secondary);
+    }
+    .retry-actions {
+      margin: 20px 0;
+    }
+    .back-link { 
+      position: absolute; top: 20px; left: 20px; 
+      color: var(--accent-color); 
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .back-link:hover { 
+      background: var(--bg-secondary);
+      text-decoration: underline; 
+    }
+  </style>
+</head>
+<body>
+  <a href="javascript:history.back()" class="back-link">← Back</a>
+  <div class="container">
+    <div class="icon" id="error-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></div>
+    <h1 id="error-title">Error</h1>
+    <h2 id="error-subtitle">Something went wrong</h2>
+    <p id="error-description">An error occurred while trying to load this page.</p>
+    
+    <div class="error-code" id="error-code"></div>
+    <div class="error-url" id="error-url"></div>
+    
+    <div class="error-details" id="error-details">
+      <h3>Try:</h3>
+      <ul id="error-suggestions">
+        <li>Check your internet connection</li>
+        <li>Try refreshing the page</li>
+        <li>Check if the URL is correct</li>
+      </ul>
+    </div>
+    
+    <div class="retry-actions">
+      <button class="retry-btn" onclick="retryPage()">Refresh</button>
+      <button class="retry-btn secondary" onclick="goBack()">← Go Back</button>
+    </div>
+  </div>
+
+  <script src="nova://shared/theme.js"></script>
+  <script>
+    // Network error codes and their user-friendly messages
+    const ERROR_MESSAGES = {
+      // Common errors
+      '-6': {
+        title: 'File Not Found',
+        subtitle: 'The requested file could not be found',
+        description: 'The file you\'re looking for doesn\'t exist on this server.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-x-icon lucide-file-x"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m14.5 12.5-5 5"/><path d="m9.5 12.5 5 5"/></svg>📁',
+        suggestions: [
+          'Check if the URL is spelled correctly',
+          'The file may have been moved or deleted',
+          'Try navigating from the website\'s home page'
+        ]
+      },
+      '-7': {
+        title: 'Request Timed Out',
+        subtitle: 'The connection took too long',
+        description: 'The server took too long to respond to your request.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-clock-icon lucide-file-clock"><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 22h2a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M8 14v2.2l1.6 1"/><circle cx="8" cy="16" r="6"/></svg>',
+        suggestions: [
+          'Check your internet connection',
+          'Try refreshing the page',
+          'The server might be experiencing heavy traffic',
+          'Try again later'
+        ]
+      },
+      '-10': {
+        title: 'Access Denied',
+        subtitle: 'You don\'t have permission to access this resource',
+        description: 'The server denied your request to access this content.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-lock2-icon lucide-file-lock-2"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v1"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><rect width="8" height="5" x="2" y="13" rx="1"/><path d="M8 13v-2a2 2 0 1 0-4 0v2"/></svg>',
+        suggestions: [
+          'Check if you need to log in',
+          'You might not have the required permissions',
+          'Contact the website administrator if you think this is an error'
+        ]
+      },
+      '-21': {
+        title: 'Network Changed',
+        subtitle: 'Your network connection changed',
+        description: 'Your network configuration changed while loading the page.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wifi-sync-icon lucide-wifi-sync"><path d="M11.965 10.105v4L13.5 12.5a5 5 0 0 1 8 1.5"/><path d="M11.965 14.105h4"/><path d="M17.965 18.105h4L20.43 19.71a5 5 0 0 1-8-1.5"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M21.965 22.105v-4"/><path d="M5 12.86a10 10 0 0 1 3-2.032"/><path d="M8.5 16.429h.01"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'Check your network connection',
+          'Your WiFi network may have changed'
+        ]
+      },
+      '-100': {
+        title: 'Connection Closed',
+        subtitle: 'The connection was unexpectedly closed',
+        description: 'The server closed the connection before the request could be completed.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-off-icon lucide-route-off"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5c.4 0 .9-.1 1.3-.2"/><path d="M5.2 5.2A3.5 3.53 0 0 0 6.5 12H12"/><path d="m2 2 20 20"/><path d="M21 15.3a3.5 3.5 0 0 0-3.3-3.3"/><path d="M15 5h-4.3"/><circle cx="18" cy="5" r="3"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'Check your internet connection',
+          'The server might be experiencing issues'
+        ]
+      },
+      '-101': {
+        title: 'Connection Reset',
+        subtitle: 'The connection was reset',
+        description: 'The connection to the server was reset unexpectedly.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wifi-sync-icon lucide-wifi-sync"><path d="M11.965 10.105v4L13.5 12.5a5 5 0 0 1 8 1.5"/><path d="M11.965 14.105h4"/><path d="M17.965 18.105h4L20.43 19.71a5 5 0 0 1-8-1.5"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M21.965 22.105v-4"/><path d="M5 12.86a10 10 0 0 1 3-2.032"/><path d="M8.5 16.429h.01"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'Check your internet connection',
+          'Try accessing the site later'
+        ]
+      },
+      '-102': {
+        title: 'Connection Refused',
+        subtitle: 'The server refused the connection',
+        description: 'The server actively refused to establish a connection.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-off-icon lucide-server-off"><path d="M7 2h13a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-5"/><path d="M10 10 2.5 2.5C2 2 2 2.5 2 5v3a2 2 0 0 0 2 2h6z"/><path d="M22 17v-1a2 2 0 0 0-2-2h-1"/><path d="M4 14a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16.5l1-.5.5.5-8-8H4z"/><path d="M6 18h.01"/><path d="m2 2 20 20"/></svg>',
+        suggestions: [
+          'Check if the website is down',
+          'Verify the URL is correct',
+          'Try accessing the site later',
+          'Check if the port number is correct'
+        ]
+      },
+      '-103': {
+        title: 'Connection Aborted',
+        subtitle: 'The connection was aborted',
+        description: 'The connection was terminated before completing the request.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-off-icon lucide-route-off"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5c.4 0 .9-.1 1.3-.2"/><path d="M5.2 5.2A3.5 3.53 0 0 0 6.5 12H12"/><path d="m2 2 20 20"/><path d="M21 15.3a3.5 3.5 0 0 0-3.3-3.3"/><path d="M15 5h-4.3"/><circle cx="18" cy="5" r="3"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'Check your internet connection',
+          'The server might be overloaded'
+        ]
+      },
+      '-104': {
+        title: 'Connection Failed',
+        subtitle: 'Failed to connect to the server',
+        description: 'Could not establish a connection to the server.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-off-icon lucide-server-off"><path d="M7 2h13a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-5"/><path d="M10 10 2.5 2.5C2 2 2 2.5 2 5v3a2 2 0 0 0 2 2h6z"/><path d="M22 17v-1a2 2 0 0 0-2-2h-1"/><path d="M4 14a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16.5l1-.5.5.5-8-8H4z"/><path d="M6 18h.01"/><path d="m2 2 20 20"/></svg>',
+        suggestions: [
+          'Check your internet connection',
+          'Verify the URL is correct',
+          'Try accessing the site later',
+          'Check if you\'re behind a firewall'
+        ]
+      },
+      '-105': {
+        title: 'Name Not Resolved',
+        subtitle: 'Could not resolve the domain name',
+        description: 'The domain name could not be translated to an IP address.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe-lock-icon lucide-globe-lock"><path d="M15.686 15A14.5 14.5 0 0 1 12 22a14.5 14.5 0 0 1 0-20 10 10 0 1 0 9.542 13"/><path d="M2 12h8.5"/><path d="M20 6V4a2 2 0 1 0-4 0v2"/><rect width="8" height="5" x="14" y="6" rx="1"/></svg>',
+        suggestions: [
+          'Check if the URL is spelled correctly',
+          'Try using a different DNS server',
+          'Check your internet connection',
+          'The website might no longer exist'
+        ]
+      },
+      '-106': {
+        title: 'Internet Disconnected',
+        subtitle: 'No internet connection',
+        description: 'Your device is not connected to the internet.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe-lock-icon lucide-globe-lock"><path d="M15.686 15A14.5 14.5 0 0 1 12 22a14.5 14.5 0 0 1 0-20 10 10 0 1 0 9.542 13"/><path d="M2 12h8.5"/><path d="M20 6V4a2 2 0 1 0-4 0v2"/><rect width="8" height="5" x="14" y="6" rx="1"/></svg>',
+        suggestions: [
+          'Check your WiFi or ethernet connection',
+          'Try connecting to a different network',
+          'Restart your router or modem',
+          'Contact your internet service provider'
+        ]
+      },
+      '-107': {
+        title: 'SSL Protocol Error',
+        subtitle: 'Secure connection failed',
+        description: 'There was an error with the secure connection protocol.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe-lock-icon lucide-globe-lock"><path d="M15.686 15A14.5 14.5 0 0 1 12 22a14.5 14.5 0 0 1 0-20 10 10 0 1 0 9.542 13"/><path d="M2 12h8.5"/><path d="M20 6V4a2 2 0 1 0-4 0v2"/><rect width="8" height="5" x="14" y="6" rx="1"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'Check if your system date and time are correct',
+          'The website\'s security certificate might be invalid',
+          'Try accessing the site later'
+        ]
+      },
+      '-108': {
+        title: 'Invalid Address',
+        subtitle: 'The address format is invalid',
+        description: 'The URL or address you entered is not valid.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-question-mark-icon lucide-file-question-mark"><path d="M12 17h.01"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/></svg>',
+        suggestions: [
+          'Check if the URL is spelled correctly',
+          'Make sure the address format is correct',
+          'Try copying and pasting the URL from a reliable source'
+        ]
+      },
+      '-109': {
+        title: 'Address Unreachable',
+        subtitle: 'Cannot reach the destination',
+        description: 'The network address cannot be reached from your location.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-off-icon lucide-route-off"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5c.4 0 .9-.1 1.3-.2"/><path d="M5.2 5.2A3.5 3.53 0 0 0 6.5 12H12"/><path d="m2 2 20 20"/><path d="M21 15.3a3.5 3.5 0 0 0-3.3-3.3"/><path d="M15 5h-4.3"/><circle cx="18" cy="5" r="3"/></svg>',
+        suggestions: [
+          'Check your internet connection',
+          'The server might be down',
+          'Try using a VPN if the site is blocked in your region',
+          'Contact your network administrator'
+        ]
+      },
+      '-110': {
+        title: 'Client Certificate Required',
+        subtitle: 'Authentication certificate needed',
+        description: 'The server requires a client certificate for authentication.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-key2-icon lucide-file-key-2"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v6"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="4" cy="16" r="2"/><path d="m10 10-4.5 4.5"/><path d="m9 11 1 1"/></svg>',
+        suggestions: [
+          'Contact the website administrator for a certificate',
+          'Check if you have the required certificate installed',
+          'This is typically required for corporate or secure sites'
+        ]
+      },
+      '-118': {
+        title: 'Connection Timed Out',
+        subtitle: 'The connection attempt took too long',
+        description: 'The connection to the server timed out.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-alert-icon lucide-clock-alert"><path d="M12 6v6l4 2"/><path d="M20 12v5"/><path d="M20 21h.01"/><path d="M21.25 8.2A10 10 0 1 0 16 21.16"/></svg>',
+        suggestions: [
+          'Check your internet connection',
+          'Try refreshing the page',
+          'The server might be slow or overloaded',
+          'Try again later'
+        ]
+      },
+      '-138': {
+        title: 'Network Access Denied',
+        subtitle: 'Network access is blocked',
+        description: 'Access to the network resource has been denied.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-lock2-icon lucide-file-lock-2"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v1"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><rect width="8" height="5" x="2" y="13" rx="1"/><path d="M8 13v-2a2 2 0 1 0-4 0v2"/></svg>',
+        suggestions: [
+          'Check if you\'re connected to the right network',
+          'Contact your network administrator',
+          'You might need special permissions',
+          'Try from a different network'
+        ]
+      },
+      '-200': {
+        title: 'Certificate Name Invalid',
+        subtitle: 'SSL certificate name mismatch',
+        description: 'The security certificate doesn\'t match the website name.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-lock2-icon lucide-file-lock-2"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v1"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><rect width="8" height="5" x="2" y="13" rx="1"/><path d="M8 13v-2a2 2 0 1 0-4 0v2"/></svg>',
+        suggestions: [
+          'Check if the URL is correct',
+          'The website might have certificate issues',
+          'Try accessing the site later',
+          'Contact the website administrator'
+        ]
+      },
+      '-201': {
+        title: 'Certificate Date Invalid',
+        subtitle: 'SSL certificate is expired or not yet valid',
+        description: 'The website\'s security certificate has an invalid date.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-alert-icon lucide-clock-alert"><path d="M12 6v6l4 2"/><path d="M20 12v5"/><path d="M20 21h.01"/><path d="M21.25 8.2A10 10 0 1 0 16 21.16"/></svg>',
+        suggestions: [
+          'Check if your system date and time are correct',
+          'The website\'s certificate might be expired',
+          'Try accessing the site later',
+          'Contact the website administrator'
+        ]
+      },
+      '-300': {
+        title: 'Invalid URL',
+        subtitle: 'The URL format is not valid',
+        description: 'The URL you entered is not properly formatted.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-off-icon lucide-route-off"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5c.4 0 .9-.1 1.3-.2"/><path d="M5.2 5.2A3.5 3.53 0 0 0 6.5 12H12"/><path d="m2 2 20 20"/><path d="M21 15.3a3.5 3.5 0 0 0-3.3-3.3"/><path d="M15 5h-4.3"/><circle cx="18" cy="5" r="3"/></svg>',
+        suggestions: [
+          'Check if the URL is spelled correctly',
+          'Make sure it starts with http:// or https://',
+          'Remove any extra characters or spaces'
+        ]
+      },
+      '-310': {
+        title: 'Too Many Redirects',
+        subtitle: 'The page redirected too many times',
+        description: 'The website is stuck in a redirect loop.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-icon lucide-route"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>',
+        suggestions: [
+          'Try clearing your browser cookies',
+          'The website might have a configuration issue',
+          'Try accessing the site later',
+          'Contact the website administrator'
+        ]
+      },
+      '-320': {
+        title: 'Invalid Response',
+        subtitle: 'The server sent an invalid response',
+        description: 'The server\'s response was malformed or unexpected.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-question-mark-icon lucide-circle-question-mark"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'The server might have issues',
+          'Try accessing the site later',
+          'Contact the website administrator'
+        ]
+      },
+      '-324': {
+        title: 'Empty Response',
+        subtitle: 'The server sent an empty response',
+        description: 'The server responded but didn\'t send any content.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-question-mark-icon lucide-circle-question-mark"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'The server might be experiencing issues',
+          'Try accessing the site later'
+        ]
+      },
+      '-501': {
+        title: 'Insecure Response',
+        subtitle: 'The connection is not secure',
+        description: 'The server\'s response was blocked for security reasons.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-alert-icon lucide-shield-alert"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>',
+        suggestions: [
+          'Make sure the URL starts with https://',
+          'The website might have security issues',
+          'Try accessing a secure version of the site',
+          'Contact the website administrator'
+        ]
+      },
+      '404': {
+        title: '404 - Page Not Found',
+        subtitle: 'The requested page doesn\'t exist',
+        description: 'The page you\'re looking for cannot be found on this server.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-question-mark-icon lucide-file-question-mark"><path d="M12 17h.01"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/></svg>',
+        suggestions: [
+          'Check if the URL is spelled correctly',
+          'The page might have been moved or deleted',
+          'Try navigating from the website\'s home page',
+          'Use the search function if available'
+        ]
+      },
+      '500': {
+        title: '500 - Internal Server Error',
+        subtitle: 'The server encountered an error',
+        description: 'The server experienced an internal error and couldn\'t complete your request.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-crash-icon lucide-server-crash"><path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"/><path d="M6 6h.01"/><path d="M6 18h.01"/><path d="m13 6-4 6h6l-4 6"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'The server might be temporarily down',
+          'Try again later',
+          'Contact the website administrator'
+        ]
+      },
+      '502': {
+        title: '502 - Bad Gateway',
+        subtitle: 'Bad gateway error',
+        description: 'The server received an invalid response from an upstream server.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-crash-icon lucide-server-crash"><path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"/><path d="M6 6h.01"/><path d="M6 18h.01"/><path d="m13 6-4 6h6l-4 6"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'The server might be temporarily down',
+          'Try again later'
+        ]
+      },
+      '503': {
+        title: '503 - Service Unavailable',
+        subtitle: 'Service temporarily unavailable',
+        description: 'The server is temporarily unable to handle your request.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-crash-icon lucide-server-crash"><path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"/><path d="M6 6h.01"/><path d="M6 18h.01"/><path d="m13 6-4 6h6l-4 6"/></svg>',
+        suggestions: [
+          'The server might be undergoing maintenance',
+          'Try again later',
+          'The server might be overloaded'
+        ]
+      },
+      '504': {
+        title: '504 - Gateway Timeout',
+        subtitle: 'Gateway timeout error',
+        description: 'The server didn\'t receive a timely response from an upstream server.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-alert-icon lucide-clock-alert"><path d="M12 6v6l4 2"/><path d="M20 12v5"/><path d="M20 21h.01"/><path d="M21.25 8.2A10 10 0 1 0 16 21.16"/></svg>',
+        suggestions: [
+          'Try refreshing the page',
+          'The server might be slow',
+          'Try again later'
+        ]
+      },
+      'nova-404': {
+        title: '404 - Nova Page Not Found',
+        subtitle: 'The Nova page doesn\'t exist',
+        description: 'The Nova internal page you\'re looking for doesn\'t exist.',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-question-mark-icon lucide-file-question-mark"><path d="M12 17h.01"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/></svg>',
+        suggestions: [
+          'Check if the nova:// URL is spelled correctly',
+          'The page might not be implemented yet',
+          'Try one of the available pages below'
+        ]
+      }
+    };
+
+    // Default error for unknown error codes
+    const DEFAULT_ERROR = {
+      title: 'Unknown Error',
+      subtitle: 'An unexpected error occurred',
+      description: 'Something went wrong while loading this page.',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
+      suggestions: [
+        'Try refreshing the page',
+        'Check your internet connection',
+        'Try again later',
+        'Contact technical support if the problem persists'
+      ]
+    };
+
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        code: params.get('code') || 'unknown',
+        url: params.get('url') || 'unknown',
+        message: params.get('message') || ''
+      };
+    }
+
+    function displayError() {
+      const { code, url, message } = getUrlParams();
+      
+      // Get error info or use default
+      const errorInfo = ERROR_MESSAGES[code] || DEFAULT_ERROR;
+      
+      // Update page elements
+      document.getElementById('error-icon').innerHTML = errorInfo.icon;
+      document.getElementById('error-title').textContent = errorInfo.title;
+      document.getElementById('error-subtitle').textContent = errorInfo.subtitle;
+      document.getElementById('error-description').textContent = errorInfo.description;
+      document.getElementById('error-code').textContent = code === 'unknown' ? 'ERROR' : `Error Code: ${code}`;
+      document.getElementById('error-url').textContent = decodeURIComponent(url);
+      
+      // Update suggestions
+      const suggestionsList = document.getElementById('error-suggestions');
+      suggestionsList.innerHTML = '';
+      errorInfo.suggestions.forEach(suggestion => {
+        const li = document.createElement('li');
+        li.textContent = suggestion;
+        suggestionsList.appendChild(li);
+      });
+      
+      // Update page title
+      document.title = `${errorInfo.title} - Nova Browser`;
+      
+      // Add custom message if provided
+      if (message && message.trim()) {
+        const customMessage = document.createElement('div');
+        customMessage.style.cssText = `
+          color: var(--text-secondary); 
+          padding: 8px 0; 
+          font-family: 'Consolas', 'Monaco', monospace; 
+          display: block;
+          margin: 15px 0;
+          font-size: 0.85em;
+        `;
+        customMessage.textContent = `Details: ${message.toUpperCase()}`;
+        
+        // Insert after the error URL
+        const errorUrl = document.getElementById('error-url');
+        errorUrl.parentNode.insertBefore(customMessage, errorUrl.nextSibling);
+      }
+    }
+
+    function retryPage() {
+      const { url } = getUrlParams();
+      if (url && url !== 'unknown') {
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('navigate', decodeURIComponent(url));
+        } else if (window.navigateToUrl) {
+          window.navigateToUrl(decodeURIComponent(url));
+        } else {
+          window.location.href = decodeURIComponent(url);
+        }
+      } else {
+        window.location.reload();
+      }
+    }
+
+    function goBack() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        if (window.novaAPI && window.novaAPI.ipc) {
+          window.novaAPI.ipc.send('navigate', 'nova://home');
+        } else if (window.navigateToUrl) {
+          window.navigateToUrl('nova://home');
+        } else {
+          window.location.href = 'nova://home';
+        }
+      }
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize theme
+      try {
+        if (window.NovaTheme && typeof window.NovaTheme === 'function') {
+          new window.NovaTheme();
+        } else {
+          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        }
+      } catch (error) {
+        console.warn('[Error Page] Theme initialization failed:', error);
+      }
+      
+      displayError();
+    });
+  </script>
+</body>
+</html>

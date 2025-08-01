@@ -218,7 +218,7 @@
   <script>
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', async () => {
-      console.log('[Bookmarks] Page loading...');
+      console.debug('[Bookmarks] Page loading...');
       
       // Initialize theme first - wait for theme.js to load
       try {
@@ -248,10 +248,8 @@
       let novaSettings;
       if (window.novaSettings) {
         novaSettings = window.novaSettings;
-        console.log('[Bookmarks] Using window.novaSettings');
       } else if (window.novaAPI && window.novaAPI.settings) {
         novaSettings = window.novaAPI.settings;
-        console.log('[Bookmarks] Using window.novaAPI.settings');
       } else {
         console.error('[Bookmarks] No settings API available!');
         document.getElementById('bookmarks-list').innerHTML = '<p style="color: var(--danger-color);">Settings API not available. Please reload the page.</p>';
@@ -261,7 +259,7 @@
       // Store settings globally
       window.bookmarkNovaSettings = novaSettings;
       
-      console.log('[Bookmarks] Loading bookmarks...');
+      console.debug('[Bookmarks] Loading bookmarks...');
       await loadBookmarks(novaSettings);
     });
 
@@ -399,15 +397,14 @@
     }
 
     async function loadBookmarks(novaSettings) {
-      console.log('[Bookmarks] loadBookmarks called');
       try {
         if (!novaSettings) {
           throw new Error('Settings API not available');
         }
         
-        console.log('[Bookmarks] Getting bookmarks from settings...');
+        console.debug('[Bookmarks] Getting bookmarks from settings...');
         const bookmarks = await novaSettings.get('bookmarks', []);
-        console.log('[Bookmarks] Retrieved bookmarks:', bookmarks.length, 'items');
+        console.debug('[Bookmarks] Retrieved bookmarks:', bookmarks.length, 'items');
         
         displayBookmarks(bookmarks, novaSettings);
       } catch (error) {
@@ -431,16 +428,15 @@
     }
 
     async function displayBookmarks(bookmarks, novaSettings) {
-      console.log('[Bookmarks] displayBookmarks called with', bookmarks.length, 'bookmarks');
       const container = document.getElementById('bookmarks-list');
       container.innerHTML = '';
 
       // Get folders too
       const folders = await novaSettings.get('bookmark-folders', []);
-      console.log('[Bookmarks] Retrieved folders:', folders.length, 'folders');
+      console.debug('[Bookmarks] Retrieved folders:', folders.length, 'folders');
 
       if (bookmarks.length === 0 && folders.length === 0) {
-        console.log('[Bookmarks] No bookmarks or folders to display');
+        console.debug('[Bookmarks] No bookmarks or folders to display');
         container.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin: 40px 0;">No bookmarks yet. Start browsing and bookmark your favorite pages!</p>';
         return;
       }
@@ -453,14 +449,14 @@
 
       // Display root bookmarks (not in any folder)
       const rootBookmarks = bookmarks.filter(b => !b.folderId);
-      console.log('[Bookmarks] Rendering', rootBookmarks.length, 'root bookmark items...');
+      console.debug('[Bookmarks] Rendering', rootBookmarks.length, 'root bookmark items...');
       
       for (let i = 0; i < rootBookmarks.length; i++) {
         const bookmark = rootBookmarks[i];
         await displayBookmarkItem(container, bookmark, folders, novaSettings);
       }
       
-      console.log('[Bookmarks] Finished rendering all bookmarks and folders');
+      console.debug('[Bookmarks] Finished rendering all bookmarks and folders');
       
       // Store references globally for button functions
       window.bookmarkNovaSettings = novaSettings;
@@ -639,7 +635,7 @@
     }
 
     async function displayBookmarkItem(container, bookmark, allFolders, novaSettings) {
-      console.log(`[Bookmarks] Rendering bookmark:`, bookmark.title);
+      console.debug(`[Bookmarks] Rendering bookmark:`, bookmark.title);
       
       const item = document.createElement('div');
       item.className = 'bookmark-item';
@@ -1088,7 +1084,7 @@
           window.novaAPI.ipc.send('refresh-bookmarks-bar');
         }
         
-        console.log('Bookmark moved successfully');
+        console.debug('Bookmark moved successfully');
       } catch (error) {
         console.error('Failed to move bookmark:', error);
         alert('Failed to move bookmark');

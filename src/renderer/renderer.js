@@ -23,11 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Setup IPC listener for refreshing bookmarks bar
     window.novaAPI.ipc.on('refresh-bookmarks-bar', async () => {
-      console.log('[Nova Renderer] Received refresh-bookmarks-bar request');
+      console.debug('[Nova Renderer] Received refresh-bookmarks-bar request');
       if (typeof loadBookmarksBar === 'function') {
         try {
           await loadBookmarksBar();
-          console.log('[Nova Renderer] Bookmarks bar refreshed successfully');
+          console.debug('[Nova Renderer] Bookmarks bar refreshed successfully');
         } catch (error) {
           console.error('[Nova Renderer] Failed to refresh bookmarks bar:', error);
         }
@@ -328,9 +328,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load 404 page with page name
   async function load404Page(page, webview) {
-    // With nova:// protocol, we can just load the 404 page directly
-    console.debug(`[Nova Renderer] Loading 404 page for: ${page}`);
-    webview.src = 'nova://404';
+    // Redirect to error page with nova-404 code
+    console.debug(`[Nova Renderer] Loading nova-404 error page for: ${page}`);
+    const errorPageUrl = `nova://error?code=nova-404&url=${encodeURIComponent('nova://' + page)}&message=Page not found`;
+    
+    // Set nova URL to maintain proper navigation
+    webview.dataset.novaUrl = errorPageUrl;
+    
+    // Handle the error page
+    handleNovaPage(errorPageUrl, webview);
   }
 
   // Generate home page content for new tabs
@@ -554,6 +560,25 @@ document.addEventListener('DOMContentLoaded', () => {
             success: false,
             error: error.message
           });
+        }
+      }
+    });
+
+    // Handle webview loading failures and network errors
+    webview.addEventListener('did-fail-load', (event) => {
+      if (event.isMainFrame && event.errorCode !== 0) {
+        const originalUrl = event.validatedURL || webview.getURL();
+        const errorCode = event.errorCode;
+        
+        console.debug(`[Nova Renderer] Thrown error for page: ${originalUrl} (Error code: ${errorCode}, ${event.errorDescription})`);
+        const errorPageUrl = `nova://error?code=${errorCode}&url=${encodeURIComponent(originalUrl)}&message=${encodeURIComponent(event.errorDescription || 'Unknown error')}`;
+        
+        webview.dataset.novaUrl = errorPageUrl;
+        
+        handleNovaPage(errorPageUrl, webview);
+        
+        if (webview.classList.contains('active')) {
+          urlInput.value = originalUrl;
         }
       }
     });
