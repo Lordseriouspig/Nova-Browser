@@ -755,11 +755,16 @@
         </div>
       `, async () => {
         const title = document.getElementById('bookmark-title').value.trim();
-        const url = document.getElementById('bookmark-url').value.trim();
+        let url = document.getElementById('bookmark-url').value.trim();
         
         if (!title || !url) {
           alert('Please enter both title and URL');
           return false;
+        }
+        
+        // Add https:// if no protocol is specified
+        if (!url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)) {
+          url = 'https://' + url;
         }
         
         try {
@@ -827,11 +832,16 @@
           </div>
         `, async () => {
           const newTitle = document.getElementById('edit-bookmark-title').value.trim();
-          const newUrl = document.getElementById('edit-bookmark-url').value.trim();
+          let newUrl = document.getElementById('edit-bookmark-url').value.trim();
           
           if (!newTitle || !newUrl) {
             alert('Please enter both title and URL');
             return false;
+          }
+          
+          // Add https:// if no protocol is specified
+          if (!newUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)) {
+            newUrl = 'https://' + newUrl;
           }
           
           bookmark.title = newTitle;

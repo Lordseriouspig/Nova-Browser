@@ -258,6 +258,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Navigation function for nova pages
+  window.navigateFromNova = (url) => {
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      if (url.startsWith('nova://')) {
+        handleNovaPage(url, activeWebview);
+        activeWebview.dataset.novaUrl = url;
+      } else {
+        delete activeWebview.dataset.novaUrl;
+        activeWebview.src = url;
+      }
+      document.getElementById('url').value = url;
+    }
+  };
+
   // Handle nova:// internal pages
   async function handleNovaPage(url, webview) {
     let page = url.replace('nova://', '').toLowerCase();

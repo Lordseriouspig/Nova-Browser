@@ -149,8 +149,9 @@ if (!gotTheLock) {
       // Remove any path traversal attempts and normalize
       const sanitizedPage = page
         .replace(/\.\./g, '') // Remove all .. sequences
-        .replace(/[\/\\]/g, '') // Remove all path separators
-        .replace(/[^a-zA-Z0-9\-_.]/g, ''); // Only allow safe characters
+        .replace(/[\\]/g, '/') // Normalize backslashes to forward slashes
+        .replace(/\/+/g, '/') // Remove duplicate slashes
+        .replace(/[^a-zA-Z0-9\-_./]/g, ''); // Only allow safe characters including forward slash
       
       // Validate that sanitized page is not empty and matches expected pattern
       if (!sanitizedPage || sanitizedPage.length === 0) {
@@ -167,8 +168,8 @@ if (!gotTheLock) {
       
       const isAllowed = allowedPages.some(allowed => 
         sanitizedPage === allowed || 
-        sanitizedPage === allowed.replace(/[\/\\]/g, '') ||
-        (allowed.includes('/') && sanitizedPage === allowed.split('/').pop())
+        sanitizedPage === allowed.replace(/\//g, '') ||
+        (allowed.includes('/') && sanitizedPage === allowed)
       );
       
       if (!isAllowed) {
