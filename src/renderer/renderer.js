@@ -411,6 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Update bookmark button state for new URL
         updateBookmarkButtonState(event.url);
+        
+        // Add to history
+        addToHistory(event.url, webview);
       }
     });
 
@@ -423,6 +426,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Update bookmark button state for new URL
         updateBookmarkButtonState(event.url);
+        
+        // Add to history
+        addToHistory(event.url, webview);
       }
     });
 
@@ -600,6 +606,77 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
+  }
+
+  // History tracking function
+  async function addToHistory(url, webview) {
+    try {
+      // Don't track certain URLs
+      if (url === 'about:blank' || 
+          url.startsWith('file://') || 
+          url.startsWith('chrome://') ||
+          url.startsWith('chrome-extension://') ||
+          url.startsWith('devtools://')) {
+        return;
+      }
+
+      // Get page title
+      let title = url;
+      try {
+        title = await webview.executeJavaScript('document.title') || url;
+      } catch (error) {
+        // Use URL if can't get title
+        title = url;
+      }
+
+      // Get current history
+      const history = await novaSettings.get('browsing-history', []);
+      
+      // Remove existing entry for this URL to avoid duplicates
+      const filteredHistory = history.filter(item => item.url !== url);
+      
+      // Add new entry at the beginning
+      const historyItem = {
+        id: Date.now().toString(),
+        url: url,
+        title: title,
+        favicon: getFaviconForUrl(url),
+        timestamp: new Date().toISOString(),
+        visitCount: 1
+      };
+
+      filteredHistory.unshift(historyItem);
+
+      // Limit history to 1000 items
+      const limitedHistory = filteredHistory.slice(0, 1000);
+
+      // Save to settings
+      await novaSettings.set('browsing-history', limitedHistory);
+      
+      console.debug('[Nova] Added to history:', title, url);
+    } catch (error) {
+      console.warn('[Nova] Failed to add to history:', error);
+    }
+  }
+
+  // Get favicon emoji for URL
+  function getFaviconForUrl(url) {
+    if (url.includes('google.com')) return '🔍';
+    if (url.includes('github.com')) return '🐙';
+    if (url.includes('youtube.com')) return '📺';
+    if (url.includes('wikipedia.org')) return '📖';
+    if (url.includes('stackoverflow.com')) return '💬';
+    if (url.includes('reddit.com')) return '🟠';
+    if (url.includes('twitter.com') || url.includes('x.com')) return '🐦';
+    if (url.includes('facebook.com')) return '📘';
+    if (url.includes('instagram.com')) return '📷';
+    if (url.includes('linkedin.com')) return '💼';
+    if (url.includes('amazon.com')) return '📦';
+    if (url.includes('netflix.com')) return '🎬';
+    if (url.includes('spotify.com')) return '🎵';
+    if (url.includes('nova://home')) return '🌟';
+    if (url.startsWith('nova://')) return '⚙️';
+    return '🌐';
   }
 
   // Setup events for the initial webview - use async initialization
@@ -1281,8 +1358,7 @@ function initializeThemeSystem() {
       'nova://settings', 
       'nova://bookmarks',
       'nova://history',
-      'nova://about',
-      'nova://test'
+      'nova://about'
     ];
     
     // Check if the message origin is from a trusted nova:// page

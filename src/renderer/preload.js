@@ -197,7 +197,7 @@ contextBridge.exposeInMainWorld('novaAPI', {
   // IPC API
   ipc: {
     send: (channel, ...args) => {
-      const validChannels = ['close-window', 'open-nova-url', 'refresh-bookmarks-bar', 'test-sentry', 'test-sentry-renderer'];
+      const validChannels = ['close-window', 'open-nova-url', 'refresh-bookmarks-bar'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, ...args);
       }
@@ -222,38 +222,6 @@ contextBridge.exposeInMainWorld('novaAPI', {
   system: {
     getStoreType: () => 'ipc-based',
     isReady: () => true
-  },
-  
-  // Sentry testing (development only)
-  sentry: {
-    testError: (testType = 'message') => {
-      try {
-        switch (testType) {
-          case 'js-error':
-            // Test renderer process error
-            ipcRenderer.send('test-sentry-renderer', 'js-error');
-            console.log('[Nova Renderer] Sentry JavaScript error test sent');
-            break;
-          case 'js-crash':
-            // Test undefined function call in renderer
-            ipcRenderer.send('test-sentry-renderer', 'js-crash');
-            break;
-          case 'main-error':
-            // Test main process error
-            ipcRenderer.send('test-sentry', 'js-error');
-            break;
-          case 'main-crash':
-            // Test main process crash
-            ipcRenderer.send('test-sentry', 'js-crash');
-            break;
-          default:
-            ipcRenderer.send('test-sentry-renderer', 'message');
-            console.log('[Nova Renderer] Sentry test message sent');
-        }
-      } catch (error) {
-        console.error('[Nova Renderer] Sentry test error:', error);
-      }
-    }
   }
 });
 

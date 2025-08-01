@@ -1,18 +1,12 @@
-/**
- * Shared theme utilities for consistent theming across all Nova pages
- */
-
 class NovaTheme {
   constructor() {
     this.currentTheme = 'dark';
     this.init();
   }
 
-  // Initialize theme system
   init() {
     this.applyStoredTheme();
     
-    // Only add storage listener if localStorage is available
     if (this.isLocalStorageAvailable()) {
       window.addEventListener('storage', (e) => {
         if (e.key === 'nova-theme') {
@@ -22,7 +16,6 @@ class NovaTheme {
     }
   }
 
-  // Check if localStorage is available
   isLocalStorageAvailable() {
     try {
       const test = '__nova_test__';
@@ -34,11 +27,9 @@ class NovaTheme {
     }
   }
 
-  // Apply theme from localStorage or Nova settings
   async applyStoredTheme() {
     let savedTheme = null;
     
-    // Try to get theme from localStorage if available
     if (this.isLocalStorageAvailable()) {
       try {
         savedTheme = localStorage.getItem('nova-theme');
@@ -65,7 +56,6 @@ class NovaTheme {
     this.applyTheme(themeToApply);
   }
 
-  // Apply theme
   applyTheme(theme) {
     const html = document.documentElement;
     
@@ -84,13 +74,11 @@ class NovaTheme {
     }));
   }
 
-  // Toggle between light and dark theme
   async toggleTheme() {
     const newTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
     
     this.applyTheme(newTheme);
     
-    // Save to localStorage if available
     if (this.isLocalStorageAvailable()) {
       try {
         localStorage.setItem('nova-theme', newTheme);
@@ -122,7 +110,6 @@ class NovaTheme {
     return newTheme;
   }
 
-  // Update all theme toggle buttons on the page
   updateThemeToggles() {
     const toggles = document.querySelectorAll('.theme-toggle, .theme-toggle-button, [data-theme-toggle], #themeToggle');
     toggles.forEach(toggle => {
@@ -136,17 +123,14 @@ class NovaTheme {
     });
   }
 
-  // Get current theme
   getCurrentTheme() {
     return this.currentTheme;
   }
 
-  // Check if dark mode is active
   isDarkMode() {
     return this.currentTheme === 'dark';
   }
 
-  // Set theme programmatically
   async setTheme(theme) {
     if (theme !== 'light' && theme !== 'dark') {
       console.warn('Invalid theme:', theme);
@@ -155,7 +139,6 @@ class NovaTheme {
     
     this.applyTheme(theme);
     
-    // Save to localStorage if available
     if (this.isLocalStorageAvailable()) {
       try {
         localStorage.setItem('nova-theme', theme);
@@ -174,70 +157,16 @@ class NovaTheme {
     
     return theme;
   }
-
-  async resetToDefaultTheme() {
-    // Remove from localStorage if available
-    if (this.isLocalStorageAvailable()) {
-      try {
-        localStorage.removeItem('nova-theme');
-      } catch (error) {
-        console.warn('[Nova Theme] Could not remove from localStorage:', error.message);
-      }
-    }
-    
-    this.applyTheme('dark');
-    
-    if (window.novaSettings) {
-      try {
-        await window.novaSettings.set('dark-mode', false);
-      } catch (error) {
-        console.error('Failed to save default theme to settings:', error);
-      }
-    }
-    
-    console.debug('Reset to default theme');
-    return 'dark';
-  }
-
-  // Load theme from Nova settings
-  async loadFromSettings() {
-    if (window.novaSettings) {
-      try {
-        const darkMode = await window.novaSettings.get('dark-mode', false);
-        const theme = darkMode ? 'dark' : 'light';
-        this.applyTheme(theme);
-        
-        // Save to localStorage if available
-        if (this.isLocalStorageAvailable()) {
-          try {
-            localStorage.setItem('nova-theme', theme);
-          } catch (error) {
-            console.warn('[Nova Theme] Could not save to localStorage:', error.message);
-          }
-        }
-        
-        return theme;
-      } catch (error) {
-        console.error('Failed to load theme from settings:', error);
-        return this.currentTheme;
-      }
-    }
-    return this.currentTheme;
-  }
 }
 
-// Create theme instance
 window.NovaTheme = new NovaTheme();
 
-// Convenience functions for global access
 window.toggleTheme = () => {
   return window.NovaTheme.toggleTheme();
 };
 window.setTheme = (theme) => window.NovaTheme.setTheme(theme);
 window.getCurrentTheme = () => window.NovaTheme.getCurrentTheme();
-window.resetToDefaultTheme = () => window.NovaTheme.resetToDefaultTheme();
 
-// Shared navigation function
 window.navigateToUrl = (url) => {
   if (window.navigateFromNova) {
     window.navigateFromNova(url);
@@ -246,7 +175,6 @@ window.navigateToUrl = (url) => {
   }
 };
 
-// Shared back link setup function
 window.setupBackLink = () => {
   const backLink = document.querySelector('.back-link');
   if (backLink) {
@@ -257,10 +185,9 @@ window.setupBackLink = () => {
   }
 };
 
-// Dispatch event when theme system is ready
 window.dispatchEvent(new CustomEvent('nova-theme-ready', {
   detail: { 
     theme: window.NovaTheme.getCurrentTheme(),
-    functions: ['toggleTheme', 'setTheme', 'getCurrentTheme', 'resetToDefaultTheme']
+    functions: ['toggleTheme', 'setTheme', 'getCurrentTheme']
   }
 }));

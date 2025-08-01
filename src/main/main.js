@@ -2,6 +2,20 @@ const { app, BrowserWindow, ipcMain, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Register nova:// scheme as privileged before app ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'nova',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: false
+    }
+  }
+]);
+
 // Initialize Sentry for main process error tracking
 const Sentry = require("@sentry/electron/main");
 Sentry.init({
@@ -86,35 +100,6 @@ ipcMain.on('refresh-bookmarks-bar', (event) => {
   });
 });
 
-// IPC handler for testing Sentry (development only)
-ipcMain.on('test-sentry', (event, testType) => {
-  console.log('[Nova Main] Testing Sentry with test type:', testType);
-  
-  try {
-    switch (testType) {
-      case 'js-error':
-        // Test JavaScript error
-        Sentry.captureException(new Error('Test JavaScript error from main process'));
-        console.log('[Nova Main] Sentry JavaScript error test sent');
-        break;
-      case 'js-crash':
-        // Test undefined function call
-        myUndefinedFunction();
-        break;
-      case 'native-crash':
-        // Test native crash (uncomment only for testing)
-        // process.crash();
-        break;
-      default:
-        Sentry.captureMessage('Sentry test message from main process', 'info');
-        console.log('[Nova Main] Sentry test message sent');
-    }
-  } catch (error) {
-    Sentry.captureException(error);
-    console.error('[Nova Main] Sentry test error:', error);
-  }
-});
-
 // Register as default protocol handler for nova://
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -165,8 +150,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // Register nova:// protocol
-    protocol.registerStringProtocol('nova', (request, callback) => { // TODO: Replace with a non-deprecated method
+    // Register nova:// protocol with modern handle method
+    protocol.handle('nova', (request) => {
       const url = new URL(request.url);
       
       let page;
@@ -176,13 +161,13 @@ if (!gotTheLock) {
         page = url.hostname;
       }
       
-      console.debug('[Nova Protocol] Handling nova:// request for page:', page);
-      
       // Security: Sanitize the page input to prevent path traversal
       if (!page || typeof page !== 'string') {
         console.warn('[Nova Protocol] Invalid page parameter');
-        callback({ error: -6 });
-        return;
+        return new Response('Invalid page parameter', { 
+          status: 400, 
+          headers: { 'content-type': 'text/plain' } 
+        });
       }
       
       // Remove any path traversal attempts and normalize
@@ -195,8 +180,10 @@ if (!gotTheLock) {
       // Validate that sanitized page is not empty and matches expected pattern
       if (!sanitizedPage || sanitizedPage.length === 0) {
         console.warn('[Nova Protocol] Empty or invalid page after sanitization');
-        callback({ error: -6 });
-        return;
+        return new Response('Empty or invalid page', { 
+          status: 400, 
+          headers: { 'content-type': 'text/plain' } 
+        });
       }
       
       // Whitelist of allowed pages/files to further restrict access
@@ -205,15 +192,16 @@ if (!gotTheLock) {
         'shared/theme.css', 'shared/theme.js'
       ];
       
-      const isAllowed = allowedPages.some(allowed => 
+      // Allow all assets/* requests (they are already validated by path security)
+      const isAssetRequest = sanitizedPage.startsWith('assets/');
+      const isAllowed = isAssetRequest || allowedPages.some(allowed => 
         sanitizedPage === allowed || 
         sanitizedPage === allowed.replace(/\//g, '') ||
         (allowed.includes('/') && sanitizedPage === allowed)
       );
       
       if (!isAllowed) {
-        console.warn('[Nova Protocol] Page not in allowlist:', sanitizedPage);
-        // Load error page for unauthorized access attempts
+        // Return error page for unauthorized access attempts
         const errorPagePath = path.join(__dirname, '../renderer/nova-pages', 'error.html');
         if (fs.existsSync(errorPagePath)) {
           let htmlContent = fs.readFileSync(errorPagePath, 'utf8');
@@ -230,11 +218,15 @@ if (!gotTheLock) {
             </script>
           `;
           htmlContent = htmlContent.replace('</head>', errorScript + '</head>');
-          callback({ data: htmlContent, mimeType: 'text/html' });
+          return new Response(htmlContent, {
+            headers: { 'content-type': 'text/html' }
+          });
         } else {
-          callback({ error: -6 });
+          return new Response('Page not found', { 
+            status: 404, 
+            headers: { 'content-type': 'text/plain' } 
+          });
         }
-        return;
       }
       
       try {
@@ -249,15 +241,17 @@ if (!gotTheLock) {
           const resolvedPath = path.resolve(cssPath);
           if (!resolvedPath.startsWith(allowedDir)) {
             console.warn('[Nova Protocol] Path traversal attempt blocked:', cssPath);
-            callback({ error: -6 });
-            return;
+            return new Response('Path traversal blocked', { 
+              status: 403, 
+              headers: { 'content-type': 'text/plain' } 
+            });
           }
           
           if (fs.existsSync(resolvedPath)) {
             const cssContent = fs.readFileSync(resolvedPath, 'utf8');
-            console.debug('[Nova Protocol] Loaded CSS:', sanitizedPage);
-            callback({ data: cssContent, mimeType: 'text/css' });
-            return;
+            return new Response(cssContent, {
+              headers: { 'content-type': 'text/css' }
+            });
           }
         }
         
@@ -268,15 +262,58 @@ if (!gotTheLock) {
           const resolvedPath = path.resolve(jsPath);
           if (!resolvedPath.startsWith(allowedDir)) {
             console.warn('[Nova Protocol] Path traversal attempt blocked:', jsPath);
-            callback({ error: -6 });
-            return;
+            return new Response('Path traversal blocked', { 
+              status: 403, 
+              headers: { 'content-type': 'text/plain' } 
+            });
           }
           
           if (fs.existsSync(resolvedPath)) {
             const jsContent = fs.readFileSync(resolvedPath, 'utf8');
-            console.debug('[Nova Protocol] Loaded JS:', sanitizedPage);
-            callback({ data: jsContent, mimeType: 'application/javascript' });
-            return;
+            return new Response(jsContent, {
+              headers: { 'content-type': 'application/javascript' }
+            });
+          }
+        }
+        
+        // Handle asset requests (images, etc.)
+        if (sanitizedPage.startsWith('assets/')) {
+          const assetPath = path.join(__dirname, '../../', sanitizedPage);
+          const allowedAssetsDir = path.resolve(__dirname, '../../assets');
+          const resolvedAssetPath = path.resolve(assetPath);
+          
+          if (!resolvedAssetPath.startsWith(allowedAssetsDir)) {
+            console.warn('[Nova Protocol] Asset path traversal attempt blocked:', assetPath);
+            return new Response('Asset path traversal blocked', { 
+              status: 403, 
+              headers: { 'content-type': 'text/plain' } 
+            });
+          }
+          
+          if (fs.existsSync(resolvedAssetPath)) {
+            const assetContent = fs.readFileSync(resolvedAssetPath);
+            let mimeType = 'application/octet-stream';
+            
+            const ext = path.extname(resolvedAssetPath).toLowerCase();
+            switch (ext) {
+              case '.png': mimeType = 'image/png'; break;
+              case '.jpg':
+              case '.jpeg': mimeType = 'image/jpeg'; break;
+              case '.gif': mimeType = 'image/gif'; break;
+              case '.svg': mimeType = 'image/svg+xml'; break;
+              case '.ico': mimeType = 'image/x-icon'; break;
+              case '.webp': mimeType = 'image/webp'; break;
+            }
+            
+            return new Response(assetContent, {
+              headers: { 'content-type': mimeType }
+            });
+          } else {
+            console.warn('[Nova Protocol] Asset not found:', resolvedAssetPath);
+            return new Response('Asset not found', { 
+              status: 404, 
+              headers: { 'content-type': 'text/plain' } 
+            });
           }
         }
         
@@ -287,8 +324,10 @@ if (!gotTheLock) {
         const resolvedHtmlPath = path.resolve(novaPagePath);
         if (!resolvedHtmlPath.startsWith(allowedDir)) {
           console.warn('[Nova Protocol] Path traversal attempt blocked:', novaPagePath);
-          callback({ error: -6 });
-          return;
+          return new Response('Path traversal blocked', { 
+            status: 403, 
+            headers: { 'content-type': 'text/plain' } 
+          });
         }
         
         if (fs.existsSync(resolvedHtmlPath)) {
@@ -300,8 +339,9 @@ if (!gotTheLock) {
             .replace(/\{\{TIMESTAMP\}\}/g, new Date().toISOString())
             .replace(/\{\{VERSION\}\}/g, '1.0.0');
           
-          console.debug('[Nova Protocol] Loaded nova:// page:', sanitizedPage);
-          callback({ data: htmlContent, mimeType: 'text/html' });
+          return new Response(htmlContent, {
+            headers: { 'content-type': 'text/html' }
+          });
         } else {
           // Load 404 page
           const notFoundPath = path.join(__dirname, '../renderer/nova-pages', '404.html');
@@ -309,8 +349,9 @@ if (!gotTheLock) {
           if (resolved404Path.startsWith(allowedDir) && fs.existsSync(resolved404Path)) {
             let htmlContent = fs.readFileSync(resolved404Path, 'utf8');
             htmlContent = htmlContent.replace(/\{\{PAGE\}\}/g, sanitizedPage);
-            console.debug('[Nova Protocol] Loaded 404 page for:', sanitizedPage);
-            callback({ data: htmlContent, mimeType: 'text/html' });
+            return new Response(htmlContent, {
+              headers: { 'content-type': 'text/html' }
+            });
           } else {
             // Fallback 404
             const fallback404 = `
@@ -324,12 +365,17 @@ if (!gotTheLock) {
               </body>
               </html>
             `;
-            callback({ data: fallback404, mimeType: 'text/html' });
+            return new Response(fallback404, {
+              headers: { 'content-type': 'text/html' }
+            });
           }
         }
       } catch (error) {
         console.error('[Nova Protocol] Error handling nova:// request:', error);
-        callback({ error: error.code || -6 });
+        return new Response('Internal server error', { 
+          status: 500, 
+          headers: { 'content-type': 'text/plain' } 
+        });
       }
     });
     
@@ -381,16 +427,12 @@ app.on('before-quit', async (event) => {
   try {
     const clearDataOnExit = await settingsStore.get('clear-data', false);
     if (clearDataOnExit) {
-      console.debug('[Nova Main] Clearing browsing data...');
-      
       const session = require('electron').session.defaultSession;
       
       await session.clearCache();
       await session.clearStorageData({
         storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'shadercache', 'websql', 'serviceworkers']
       });
-      
-      console.debug('[Nova Main] Browsing data cleared');
     }
   } catch (error) {
     console.error('[Nova Main] Error clearing browsing data:', error);

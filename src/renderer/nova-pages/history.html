@@ -13,6 +13,12 @@
       background: var(--bg-primary);
       color: var(--text-primary);
       transition: all 0.3s ease;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    body::-webkit-scrollbar {
+      display: none;
     }
     .container { 
       max-width: 800px; margin: 0 auto; 
@@ -41,26 +47,48 @@
     .history-item { 
       padding: 15px; 
       border-bottom: 1px solid var(--border-light); 
-      display: flex; align-items: center; 
+      display: flex; align-items: flex-start; 
       cursor: pointer;
       transition: all 0.3s ease;
+      gap: 10px;
     }
     .history-item:hover { 
       background: var(--bg-tertiary); 
     }
-    .history-favicon { width: 16px; height: 16px; margin-right: 10px; }
-    .history-info { flex: 1; }
+    .history-favicon { 
+      width: 16px; 
+      height: 16px; 
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .history-info { 
+      flex: 1; 
+      min-width: 0; /* Allows text to wrap properly */
+      overflow: hidden;
+    }
     .history-title { 
       font-weight: bold; 
-      color: var(--text-primary); 
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
     }
     .history-url { 
       color: var(--text-secondary); 
-      font-size: 0.9em; 
+      font-size: 0.9em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
     }
     .history-time { 
       color: var(--text-muted); 
-      font-size: 0.8em; margin-left: auto; 
+      font-size: 0.8em; 
+      flex-shrink: 0;
+      margin-left: 10px;
+      align-self: flex-start;
+      margin-top: 2px;
     }
     .clear-history { 
       background: #e74c3c; 
@@ -74,65 +102,382 @@
       opacity: 0.9; 
       transform: translateY(-1px);
     }
+
+    .empty-history {
+      text-align: center;
+      color: var(--text-muted);
+      font-style: italic;
+      margin: 40px 0;
+      display: none;
+    }
+
+    .empty-history.show {
+      display: block;
+    }
+
+    .history-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .search-history {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px;
+      border: 1px solid var(--border-light);
+      border-radius: 5px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .filter-select {
+      padding: 10px;
+      border: 1px solid var(--border-light);
+      border-radius: 5px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .history-date-group {
+      margin-bottom: 30px;
+    }
+
+    .history-date-header {
+      font-weight: bold;
+      color: var(--accent-color);
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .delete-item {
+      background: var(--button-bg);
+      color: var(--text-primary);
+      border: none;
+      padding: 5px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.8em;
+      margin-left: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .delete-item:hover {
+      background: #e74c3c;
+      color: white;
+    }
   </style>
 </head>
 <body>
   <a href="nova://home" class="back-link">← Back to Home</a>
   <div class="container">
     <h1>Browsing History</h1>
-    <div class="history-item" onclick="window.navigateToUrl('https://google.com')">
-      <div class="history-favicon">🔍</div>
-      <div class="history-info">
-        <div class="history-title">Google</div>
-        <div class="history-url">https://google.com</div>
-      </div>
-      <div class="history-time">2 hours ago</div>
-    </div>
-    <div class="history-item" onclick="window.navigateToUrl('https://github.com')">
-      <div class="history-favicon">🐙</div>
-      <div class="history-info">
-        <div class="history-title">GitHub</div>
-        <div class="history-url">https://github.com</div>
-      </div>
-      <div class="history-time">1 day ago</div>
-    </div>
-    <div class="history-item" onclick="window.navigateToUrl('nova://home')">
-      <div class="history-favicon">🌟</div>
-      <div class="history-info">
-        <div class="history-title">Nova Browser - Home</div>
-        <div class="history-url">nova://home</div>
-      </div>
-      <div class="history-time">3 days ago</div>
+    
+    <div class="history-controls">
+      <input type="text" id="searchInput" class="search-history" placeholder="Search history..." onkeyup="filterHistory()">
+      <select id="timeFilter" class="filter-select" title="Filter by time period" onchange="filterHistory()">
+        <option value="all">All Time</option>
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+      </select>
     </div>
     
-    <button onclick="clearHistory()" class="clear-history">Clear All History</button>
+    <div id="historyContainer">
+      <!-- History items will be dynamically loaded here -->
+    </div>
+    
+    <div class="empty-history" id="emptyMessage">
+      No browsing history found.
+    </div>
+    
+    <button onclick="clearAllHistory()" class="clear-history" id="clearButton">Clear All History</button>
   </div>
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    function clearHistory() {
-      if (confirm('Are you sure you want to clear all browsing history?')) {
-        // Hide all history items
-        const historyItems = document.querySelectorAll('.history-item');
-        historyItems.forEach(item => item.style.display = 'none');
-        
-        // Show message
-        const container = document.querySelector('.container');
-        const message = document.createElement('p');
-        message.textContent = 'History cleared successfully!';
-        message.style.textAlign = 'center';
-        message.style.color = 'var(--accent-color)';
-        message.style.fontSize = '18px';
-        message.style.marginTop = '40px';
-        container.appendChild(message);
-        
-        // Hide clear button
-        document.querySelector('.clear-history').style.display = 'none';
+    let historyItems = [];
+    let filteredItems = [];
+
+    // Initialize history page
+    async function initializeHistory() {
+      await loadHistory();
+      renderHistory();
+    }
+
+    // Load history from settings
+    async function loadHistory() {
+      try {
+        if (window.novaAPI && window.novaAPI.settings) {
+          historyItems = await window.novaAPI.settings.get('browsing-history', []);
+          // Sort by timestamp, newest first
+          historyItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          filteredItems = [...historyItems];
+        }
+      } catch (error) {
+        console.warn('Could not load browsing history:', error);
+        historyItems = [];
+        filteredItems = [];
       }
     }
 
-    // Make back link functional
+    // Save history to settings
+    async function saveHistory() {
+      try {
+        if (window.novaAPI && window.novaAPI.settings) {
+          await window.novaAPI.settings.set('browsing-history', historyItems);
+        }
+      } catch (error) {
+        console.error('Failed to save history:', error);
+      }
+    }
+
+    // Add a new history item
+    async function addHistoryItem(url, title, favicon = null) {
+      // Don't track nova:// pages except home
+      if (url.startsWith('nova://') && url !== 'nova://home') {
+        return;
+      }
+
+      // Remove existing entry for this URL to avoid duplicates
+      historyItems = historyItems.filter(item => item.url !== url);
+
+      // Add new entry at the beginning
+      const historyItem = {
+        id: Date.now().toString(),
+        url: url,
+        title: title || url,
+        favicon: favicon || getFaviconForUrl(url),
+        timestamp: new Date().toISOString(),
+        visitCount: 1
+      };
+
+      historyItems.unshift(historyItem);
+
+      // Limit history to 1000 items
+      if (historyItems.length > 1000) {
+        historyItems = historyItems.slice(0, 1000);
+      }
+
+      await saveHistory();
+    }
+
+    // Get favicon for URL
+    function getFaviconForUrl(url) {
+      if (url.includes('google.com')) return '🔍';
+      if (url.includes('github.com')) return '🐙';
+      if (url.includes('youtube.com')) return '📺';
+      if (url.includes('wikipedia.org')) return '📖';
+      if (url.includes('stackoverflow.com')) return '💬';
+      if (url.includes('nova://home')) return '🌟';
+      return '🌐';
+    }
+
+    // Format timestamp to relative time
+    function formatTimeAgo(timestamp) {
+      const now = new Date();
+      const date = new Date(timestamp);
+      const diffMs = now - date;
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffSecs < 60) return 'Just now';
+      if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      
+      return date.toLocaleDateString();
+    }
+
+    // Group history items by date
+    function groupHistoryByDate(items) {
+      const groups = {};
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+      items.forEach(item => {
+        const date = new Date(item.timestamp);
+        const dateStr = date.toDateString();
+        
+        let groupKey;
+        if (dateStr === today) {
+          groupKey = 'Today';
+        } else if (dateStr === yesterday) {
+          groupKey = 'Yesterday';
+        } else {
+          groupKey = date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+        }
+
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(item);
+      });
+
+      return groups;
+    }
+
+    // Render history items
+    function renderHistory() {
+      const container = document.getElementById('historyContainer');
+      const emptyMessage = document.getElementById('emptyMessage');
+      const clearButton = document.getElementById('clearButton');
+
+      container.innerHTML = '';
+
+      if (filteredItems.length === 0) {
+        emptyMessage.classList.add('show');
+        clearButton.style.display = historyItems.length > 0 ? 'block' : 'none';
+        return;
+      }
+
+      emptyMessage.classList.remove('show');
+      clearButton.style.display = 'block';
+
+      const groupedHistory = groupHistoryByDate(filteredItems);
+
+      Object.keys(groupedHistory).forEach(dateGroup => {
+        const dateHeader = document.createElement('div');
+        dateHeader.className = 'history-date-header';
+        dateHeader.textContent = dateGroup;
+        container.appendChild(dateHeader);
+
+        const dateGroupDiv = document.createElement('div');
+        dateGroupDiv.className = 'history-date-group';
+
+        groupedHistory[dateGroup].forEach(item => {
+          const historyElement = createHistoryElement(item);
+          dateGroupDiv.appendChild(historyElement);
+        });
+
+        container.appendChild(dateGroupDiv);
+      });
+    }
+
+    // Create a history item element
+    function createHistoryElement(item) {
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      historyItem.onclick = () => navigateToUrl(item.url);
+
+      historyItem.innerHTML = `
+        <div class="history-favicon">${item.favicon}</div>
+        <div class="history-info">
+          <div class="history-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+          <div class="history-url" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</div>
+        </div>
+        <div class="history-time">${formatTimeAgo(item.timestamp)}</div>
+        <button class="delete-item" onclick="event.stopPropagation(); deleteHistoryItem('${item.id}')">✕</button>
+      `;
+
+      return historyItem;
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Filter history based on search and time filter
+    function filterHistory() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const timeFilter = document.getElementById('timeFilter').value;
+
+      let filtered = [...historyItems];
+
+      // Apply time filter
+      if (timeFilter !== 'all') {
+        const now = new Date();
+        let cutoffDate;
+
+        switch (timeFilter) {
+          case 'today':
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'yesterday':
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            filtered = filtered.filter(item => {
+              const itemDate = new Date(item.timestamp);
+              return itemDate >= cutoffDate && itemDate < new Date(cutoffDate.getTime() + 86400000);
+            });
+            break;
+          case 'week':
+            cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            filtered = filtered.filter(item => new Date(item.timestamp) >= cutoffDate);
+            break;
+          case 'month':
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            filtered = filtered.filter(item => new Date(item.timestamp) >= cutoffDate);
+            break;
+        }
+
+        if (timeFilter === 'today') {
+          filtered = filtered.filter(item => new Date(item.timestamp) >= cutoffDate);
+        }
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        filtered = filtered.filter(item => 
+          item.title.toLowerCase().includes(searchTerm) || 
+          item.url.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      filteredItems = filtered;
+      renderHistory();
+    }
+
+    // Delete a single history item
+    async function deleteHistoryItem(itemId) {
+      if (confirm('Delete this history item?')) {
+        historyItems = historyItems.filter(item => item.id !== itemId);
+        await saveHistory();
+        filterHistory(); // Re-render with current filters
+      }
+    }
+
+    // Clear all history
+    async function clearAllHistory() {
+      if (confirm('Are you sure you want to clear all browsing history? This cannot be undone.')) {
+        historyItems = [];
+        filteredItems = [];
+        await saveHistory();
+        renderHistory();
+      }
+    }
+
+    // Navigation function
+    function navigateToUrl(url) {
+      if (window.novaAPI && window.novaAPI.navigation) {
+        window.novaAPI.navigation.goTo(url);
+      } else if (window.parent && window.parent.navigateFromNova) {
+        window.parent.navigateFromNova(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    // Make functions globally available
+    window.addHistoryItem = addHistoryItem;
+    window.navigateToUrl = navigateToUrl;
+
+    // Initialize when DOM is loaded
     document.addEventListener('DOMContentLoaded', () => {
+      initializeHistory();
       window.setupBackLink();
     });
   </script>

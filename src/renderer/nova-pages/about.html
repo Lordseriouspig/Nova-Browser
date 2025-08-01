@@ -23,8 +23,13 @@
     }
     
     .logo { 
-      font-size: 4em; 
-      margin-bottom: 20px; 
+      margin-bottom: 10px; 
+    }
+    
+    .logo img {
+      width: 256px;
+      height: 256px;
+      object-fit: contain;
     }
     
     h1 { 
@@ -102,9 +107,11 @@
 <body>
   <a href="nova://home" class="back-link">← Back to Home</a>
   <div class="container">
-    <div class="logo">🌟</div>
+    <div class="logo">
+      <img src="nova://assets/logo.png" alt="Nova Browser Logo">
+    </div>
     <h1>Nova Browser</h1>
-    <div class="version">Version 1.0.0</div>
+    <div class="version">Version 0.1.0</div>
     <p>A modern, fast, and secure web browser built with Electron.</p>
     <p>Created with ❤️ <small>and lots of pain</small> by Lordseriouspig.</p>
     <div class="info-grid">
@@ -129,9 +136,26 @@
 
   <script src="nova://shared/theme.js"></script>
   <script>
-    // Setup back link using shared function
+    // Setup back link and theme using shared function
     document.addEventListener('DOMContentLoaded', () => {
-      window.setupBackLink();
+      // Initialize theme first
+      try {
+        if (window.NovaTheme && typeof window.NovaTheme === 'function') {
+          new window.NovaTheme();
+        } else if (window.setupBackLink && typeof window.setupBackLink === 'function') {
+          // Use the theme setup from shared theme.js
+          window.setupBackLink();
+        } else {
+          // Fallback theme detection
+          const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+        }
+      } catch (error) {
+        console.warn('[About Page] Theme initialization failed:', error);
+        // Ensure a theme is set even if initialization fails
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      }
     });
   </script>
 </body>

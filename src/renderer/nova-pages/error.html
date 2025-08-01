@@ -643,14 +643,19 @@
       try {
         if (window.NovaTheme && typeof window.NovaTheme === 'function') {
           new window.NovaTheme();
+        } else if (window.setupBackLink && typeof window.setupBackLink === 'function') {
+          // Use the theme setup from shared theme.js
+          window.setupBackLink();
         } else {
+          // Fallback theme detection
           const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (prefersDark) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-          }
+          document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
         }
       } catch (error) {
         console.warn('[Error Page] Theme initialization failed:', error);
+        // Ensure a theme is set even if initialization fails
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
       }
       
       displayError();
