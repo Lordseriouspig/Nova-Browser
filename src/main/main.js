@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // Register nova:// scheme as privileged before app ready
 protocol.registerSchemesAsPrivileged([
@@ -42,6 +43,15 @@ const settingsStore = new Store({
     'zoom-level': 100,
     'hardware-acceleration': true,
     'developer-tools': true,
+    'download-location': path.join(os.homedir(), 'Downloads'),
+  }
+});
+
+// Store for download history
+const downloadsStore = new Store({
+  name: 'nova-downloads',
+  defaults: {
+    'downloads': []
   }
 });
 
@@ -98,6 +108,71 @@ ipcMain.on('refresh-bookmarks-bar', (event) => {
   allWindows.forEach(window => {
     window.webContents.send('refresh-bookmarks-bar');
   });
+});
+
+// IPC handlers for download management
+ipcMain.handle('get-downloads', async () => {
+  try {
+    return downloadsStore.get('downloads', []);
+  } catch (error) {
+    console.error('Failed to get downloads:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('clear-downloads', async () => {
+  try {
+    downloadsStore.set('downloads', []);
+    return true;
+  } catch (error) {
+    console.error('Failed to clear downloads:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('open-download-location', async (event, downloadPath) => {
+  try {
+    if (fs.existsSync(downloadPath)) {
+      shell.showItemInFolder(downloadPath);
+    } else {
+      // If file doesn't exist, open the downloads folder
+      const downloadsPath = settingsStore.get('download-location', path.join(os.homedir(), 'Downloads'));
+      shell.openPath(downloadsPath);
+    }
+    return true;
+  } catch (error) {
+    console.error('Failed to open download location:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('remove-download-item', async (event, downloadId) => {
+  try {
+    const downloads = downloadsStore.get('downloads', []);
+    const filteredDownloads = downloads.filter(download => download.id !== downloadId);
+    downloadsStore.set('downloads', filteredDownloads);
+    return true;
+  } catch (error) {
+    console.error('Failed to remove download item:', error);
+    return false;
+  }
+});
+
+// Track active download items for cancellation
+const activeDownloads = new Map();
+
+ipcMain.handle('cancel-download', async (event, downloadId) => {
+  try {
+    const downloadItem = activeDownloads.get(downloadId);
+    if (downloadItem && !downloadItem.isCompleted()) {
+      downloadItem.cancel();
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to cancel download:', error);
+    return false;
+  }
 });
 
 // Register as default protocol handler for nova://
@@ -188,7 +263,7 @@ if (!gotTheLock) {
       
       // Whitelist of allowed pages/files to further restrict access
       const allowedPages = [
-        'home', 'about', 'settings', 'bookmarks', 'history', 'test', '404', 'error',
+        'home', 'about', 'settings', 'bookmarks', 'history', 'downloads', 'test', '404', 'error',
         'shared/theme.css', 'shared/theme.js'
       ];
       
@@ -303,6 +378,8 @@ if (!gotTheLock) {
               case '.svg': mimeType = 'image/svg+xml'; break;
               case '.ico': mimeType = 'image/x-icon'; break;
               case '.webp': mimeType = 'image/webp'; break;
+              case '.css': mimeType = 'text/css'; break;
+              case '.js': mimeType = 'application/javascript'; break;
             }
             
             return new Response(assetContent, {
@@ -377,6 +454,124 @@ if (!gotTheLock) {
           headers: { 'content-type': 'text/plain' } 
         });
       }
+    });
+    
+    // Function to generate unique filename when file already exists
+    function generateUniqueFilename(downloadLocation, originalFilename) {
+      const fullPath = path.join(downloadLocation, originalFilename);
+      
+      // If file doesn't exist, return original filename
+      if (!fs.existsSync(fullPath)) {
+        return originalFilename;
+      }
+      
+      // Parse filename and extension
+      const ext = path.extname(originalFilename);
+      const nameWithoutExt = path.basename(originalFilename, ext);
+      
+      let counter = 1;
+      let newFilename;
+      let newPath;
+      
+      // Keep incrementing until we find a unique filename
+      do {
+        newFilename = `${nameWithoutExt} (${counter})${ext}`;
+        newPath = path.join(downloadLocation, newFilename);
+        counter++;
+      } while (fs.existsSync(newPath));
+      
+      return newFilename;
+    }
+    
+    // Set up download handling on the default session (used by webviews)
+    session.defaultSession.on('will-download', (event, item, webContents) => {
+      console.log('[Nova Main] Download started:', item.getFilename(), 'from', item.getURL());
+      
+      const downloadLocation = settingsStore.get('download-location', path.join(os.homedir(), 'Downloads'));
+      const originalFilename = item.getFilename();
+      
+      // Generate unique filename if file already exists
+      const uniqueFilename = generateUniqueFilename(downloadLocation, originalFilename);
+      const savePath = path.join(downloadLocation, uniqueFilename);
+      
+      // Ensure download directory exists
+      if (!fs.existsSync(downloadLocation)) {
+        fs.mkdirSync(downloadLocation, { recursive: true });
+      }
+      
+      item.setSavePath(savePath);
+      
+      // Create download item for tracking
+      const downloadItem = {
+        id: String(Date.now() + Math.random()), // Simple unique ID as string
+        filename: uniqueFilename,
+        url: item.getURL(),
+        totalBytes: item.getTotalBytes(),
+        receivedBytes: 0,
+        path: savePath,
+        state: 'in_progress',
+        startTime: new Date().toISOString(),
+        endTime: null,
+        cancelled: false
+      };
+      
+      console.log('[Nova Main] Created download item:', downloadItem);
+      
+      // Track active download for cancellation
+      activeDownloads.set(downloadItem.id, item);
+      
+      // Add to downloads list
+      const downloads = downloadsStore.get('downloads', []);
+      downloads.unshift(downloadItem);
+      downloadsStore.set('downloads', downloads);
+      
+      // Get the main window to send notifications
+      const allWindows = BrowserWindow.getAllWindows();
+      const mainWindow = allWindows[0]; // Get the first (main) window
+      
+      if (mainWindow) {
+        // Notify renderer of new download
+        mainWindow.webContents.send('download-started', downloadItem);
+      }
+      
+      item.on('updated', (event, state) => {
+        downloadItem.receivedBytes = item.getReceivedBytes();
+        downloadItem.state = state;
+        
+        // Update download in store
+        const currentDownloads = downloadsStore.get('downloads', []);
+        const index = currentDownloads.findIndex(d => d.id === downloadItem.id);
+        if (index !== -1) {
+          currentDownloads[index] = downloadItem;
+          downloadsStore.set('downloads', currentDownloads);
+        }
+        
+        // Notify renderer of progress
+        if (mainWindow) {
+          mainWindow.webContents.send('download-updated', downloadItem);
+        }
+      });
+      
+      item.once('done', (event, state) => {
+        downloadItem.state = state;
+        downloadItem.endTime = new Date().toISOString();
+        
+        // Remove from active downloads
+        activeDownloads.delete(downloadItem.id);
+        
+        // Final update in store
+        const currentDownloads = downloadsStore.get('downloads', []);
+        const index = currentDownloads.findIndex(d => d.id === downloadItem.id);
+        if (index !== -1) {
+          currentDownloads[index] = downloadItem;
+          downloadsStore.set('downloads', currentDownloads);
+        }
+        
+        // Notify renderer of completion
+        if (mainWindow) {
+          mainWindow.webContents.send('download-completed', downloadItem);
+        }
+      });
     });
     
     createWindow();

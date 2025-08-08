@@ -53,6 +53,25 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('[Nova Renderer] loadBookmarksBar function not available');
       }
     });
+
+    // Setup IPC listeners for download updates
+    window.novaAPI.ipc.on('download-started', (event, downloadItem) => {
+      console.log('[Nova Renderer] Download started:', downloadItem);
+      updateDownloadBadge();
+      createDownloadNotification(downloadItem);
+    });
+    
+    window.novaAPI.ipc.on('download-updated', (event, downloadItem) => {
+      console.log('[Nova Renderer] Download updated:', downloadItem);
+      updateDownloadBadge();
+      updateDownloadNotification(downloadItem);
+    });
+    
+    window.novaAPI.ipc.on('download-completed', (event, downloadItem) => {
+      console.log('[Nova Renderer] Download completed:', downloadItem);
+      updateDownloadBadge();
+      updateDownloadNotification(downloadItem);
+    });
   }
 
   // Setup IPC listener for settings
@@ -117,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const goBtn = document.getElementById('go');
   const urlInput = document.getElementById('url');
   const bookmarkBtn = document.getElementById('bookmark-btn');
+  const downloadsBtn = document.getElementById('downloads-btn');
   const bookmarksBar = document.getElementById('bookmarks-bar');
 
   let tabCount = 1;
@@ -273,6 +293,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeWebview = getActiveWebview();
     if (activeWebview) {
       activeWebview.openDevTools();
+    }
+  });
+
+  // Downloads button event listener
+  downloadsBtn.addEventListener('click', async () => {
+    console.log('[Nova Renderer] Toolbar downloads button clicked');
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      console.log('[Nova Renderer] Toolbar calling handleNovaPage');
+      await handleNovaPage('nova://downloads', activeWebview);
+      updateUrlFromWebview(activeWebview);
     }
   });
 
@@ -1337,6 +1368,24 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Failed to update bookmarks bar visibility:', error);
     }
   }
+
+  // Download page navigation function
+  async function openDownloadsPage() {
+    console.log('[Nova Renderer] openDownloadsPage called');
+    const activeWebview = getActiveWebview();
+    console.log('[Nova Renderer] Active webview:', activeWebview);
+    if (activeWebview) {
+      console.log('[Nova Renderer] Calling handleNovaPage with nova://downloads');
+      await handleNovaPage('nova://downloads', activeWebview);
+      updateUrlFromWebview(activeWebview);
+      console.log('[Nova Renderer] Navigation completed');
+    } else {
+      console.warn('[Nova Renderer] No active webview found');
+    }
+  }
+
+  // Make openDownloadsPage available globally
+  window.openDownloadsPage = openDownloadsPage;
 });
 
 // Theme system initialization
@@ -1420,3 +1469,483 @@ function applyThemeToMainWindow(theme) {
   
   console.debug('[Nova Renderer] Applied theme to main window:', theme);
 }
+
+// Update download badge with current download count
+async function updateDownloadBadge() {
+  try {
+    if (window.novaAPI && window.novaAPI.invoke) {
+      const downloads = await window.novaAPI.invoke('get-downloads');
+      if (!Array.isArray(downloads)) {
+        console.warn('[Nova Renderer] Invalid downloads data received:', downloads);
+        return;
+      }
+      
+      const activeDownloads = downloads.filter(d => d && d.state === 'in_progress').length;
+      const downloadCountEl = document.getElementById('download-count');
+      
+      if (downloadCountEl) {
+        downloadCountEl.textContent = activeDownloads;
+        if (activeDownloads > 0) {
+          downloadCountEl.classList.remove('zero');
+        } else {
+          downloadCountEl.classList.add('zero');
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[Nova Renderer] Failed to update download badge:', error);
+    // Hide badge on error to avoid showing stale data
+    const downloadCountEl = document.getElementById('download-count');
+    if (downloadCountEl) {
+      downloadCountEl.classList.add('zero');
+    }
+  }
+}
+
+// Initialize download badge on page load
+updateDownloadBadge();
+
+// Download notification system
+let activeNotifications = new Map();
+
+function createDownloadNotification(downloadItem) {
+  try {
+    console.log('[Nova Renderer] Creating notification for download:', downloadItem);
+    
+    // Ensure ID is a string
+    const downloadId = String(downloadItem.id);
+    
+    // Remove any existing notification for this download
+    if (activeNotifications.has(downloadId)) {
+      removeDownloadNotification(downloadId);
+    }
+
+    const notification = document.createElement('div');
+    notification.className = 'download-notification';
+    notification.id = `download-notification-${downloadId}`;
+    
+    const fileIcon = getDownloadFileIcon(downloadItem.filename);
+    
+    // Check if download is already completed
+    const isInstantDownload = downloadItem.state === 'completed';
+    const title = isInstantDownload ? 'Download Complete' : 'Download Started';
+    
+    notification.innerHTML = `
+      <div class="download-notification-header">
+        <div class="download-notification-title">
+          ${fileIcon} ${title}
+        </div>
+        <button class="download-notification-close" data-action="dismiss" data-download-id="${downloadId}">
+          ✕
+        </button>
+      </div>
+      <div class="download-notification-content">
+        <div class="download-notification-filename">${escapeHtml(downloadItem.filename)}</div>
+        <div class="download-notification-url">${escapeHtml(downloadItem.url)}</div>
+      </div>
+      ${!isInstantDownload ? `
+        <div class="download-notification-progress">
+          <div class="download-notification-progress-bar">
+            <div class="download-notification-progress-fill" id="progress-fill-${downloadId}"></div>
+          </div>
+          <div class="download-notification-status">
+            <span id="progress-text-${downloadId}">Starting download...</span>
+            <span id="progress-size-${downloadId}">0 B</span>
+          </div>
+        </div>
+      ` : `
+        <div class="download-notification-status">
+          <span>Download completed successfully</span>
+          <span>${formatDownloadSize(downloadItem.receivedBytes)}</span>
+        </div>
+      `}
+      <div class="download-notification-actions">
+        <button class="download-notification-btn primary view-all-btn" data-action="view-all">View All</button>
+        ${isInstantDownload ? `
+          <button class="download-notification-btn open-folder-btn" data-action="open-folder" data-path="${downloadItem.path}">Open Folder</button>
+        ` : `
+          <button class="download-notification-btn danger cancel-btn" data-action="cancel" data-download-id="${downloadId}">Cancel</button>
+        `}
+        <button class="download-notification-btn dismiss-btn" data-action="dismiss" data-download-id="${downloadId}">Dismiss</button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Add event delegation for notification buttons
+    notification.addEventListener('click', async (e) => {
+      const button = e.target.closest('[data-action]');
+      if (!button) return;
+      
+      const action = button.dataset.action;
+      console.log('[Nova Renderer] Notification button clicked:', action);
+      
+      switch (action) {
+        case 'view-all':
+          await openDownloadsPage();
+          break;
+        case 'open-folder':
+          const path = button.dataset.path;
+          openDownloadFolder(path);
+          break;
+        case 'cancel':
+          const cancelId = button.dataset.downloadId;
+          await cancelDownload(cancelId);
+          break;
+        case 'dismiss':
+          const dismissId = button.dataset.downloadId;
+          removeDownloadNotification(dismissId);
+          break;
+        case 'retry':
+          const retryUrl = button.dataset.downloadUrl;
+          retryDownloadUrl(retryUrl);
+          removeDownloadNotification(downloadId);
+          break;
+      }
+    });
+    
+    // Trigger animation
+    setTimeout(() => {
+      notification.classList.add('show');
+    }, 100);
+    
+    // Store reference using string ID
+    activeNotifications.set(downloadId, notification);
+    console.log('[Nova Renderer] Stored notification with ID:', downloadId);
+    
+    return notification;
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to create download notification:', error);
+    // Fallback to simple browser notification if available
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Download Started', {
+        body: `${downloadItem.filename}`,
+        icon: '/assets/logo.png'
+      });
+    }
+  }
+}
+
+function updateDownloadNotification(downloadItem) {
+  try {
+    // Ensure ID is a string
+    const downloadId = String(downloadItem.id);
+    const notification = activeNotifications.get(downloadId);
+    if (!notification) return;
+    
+    const progressFill = document.getElementById(`progress-fill-${downloadId}`);
+    const progressText = document.getElementById(`progress-text-${downloadId}`);
+    const progressSize = document.getElementById(`progress-size-${downloadId}`);
+    
+    if (progressFill && progressText && progressSize) {
+      const progress = downloadItem.totalBytes > 0 
+        ? Math.round((downloadItem.receivedBytes / downloadItem.totalBytes) * 100)
+        : 0;
+      
+      progressFill.style.width = `${progress}%`;
+      
+      // Handle different states with appropriate messages
+      switch (downloadItem.state) {
+        case 'in_progress':
+          progressText.textContent = downloadItem.totalBytes > 0 
+            ? `${progress}% complete` 
+            : 'Downloading...';
+          progressSize.textContent = downloadItem.totalBytes > 0
+            ? `${formatDownloadSize(downloadItem.receivedBytes)} / ${formatDownloadSize(downloadItem.totalBytes)}`
+            : `${formatDownloadSize(downloadItem.receivedBytes)}`;
+          break;
+        case 'completed':
+          progressText.textContent = 'Download complete';
+          progressSize.textContent = formatDownloadSize(downloadItem.receivedBytes);
+          progressFill.style.width = '100%';
+          progressFill.style.backgroundColor = '#4CAF50'; // Green color for completed downloads
+          break;
+        case 'cancelled':
+          progressText.textContent = 'Download cancelled';
+          progressSize.textContent = formatDownloadSize(downloadItem.receivedBytes);
+          break;
+        case 'interrupted':
+          progressText.textContent = 'Download failed';
+          progressSize.textContent = `${formatDownloadSize(downloadItem.receivedBytes)} (partial)`;
+          break;
+      }
+    }
+    
+    // Update title based on state
+    const titleElement = notification.querySelector('.download-notification-title');
+    if (titleElement) {
+      const fileIcon = getDownloadFileIcon(downloadItem.filename);
+      switch (downloadItem.state) {
+        case 'completed':
+          titleElement.innerHTML = `${fileIcon} Download Complete`;
+          // Replace cancel button with "Open Folder" button for completed downloads
+          addOpenFolderButton(notification, downloadItem.path);
+          break;
+        case 'cancelled':
+          titleElement.innerHTML = `${fileIcon} Download Cancelled`;
+          // Remove cancel button for cancelled downloads
+          removeCancelButton(notification);
+          break;
+        case 'interrupted':
+          titleElement.innerHTML = `${fileIcon} Download Failed`;
+          addRetryButton(notification, downloadItem);
+          break;
+        default:
+          titleElement.innerHTML = `${fileIcon} Downloading...`;
+      }
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to update download notification:', error);
+    // If there's an error updating, remove the broken notification
+    removeDownloadNotification(String(downloadItem.id));
+  }
+}
+
+function addOpenFolderButton(notification, downloadPath) {
+  try {
+    const actionsContainer = notification.querySelector('.download-notification-actions');
+    if (actionsContainer) {
+      // Remove cancel button if it exists
+      const cancelBtn = actionsContainer.querySelector('.cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.remove();
+      }
+      
+      // Add open folder button if it doesn't exist
+      if (!actionsContainer.querySelector('.open-folder-btn')) {
+        const openFolderBtn = document.createElement('button');
+        openFolderBtn.className = 'download-notification-btn open-folder-btn';
+        openFolderBtn.textContent = 'Open Folder';
+        openFolderBtn.dataset.action = 'open-folder';
+        openFolderBtn.dataset.path = downloadPath;
+        
+        // Insert before the dismiss button
+        const dismissBtn = actionsContainer.querySelector('button:last-child');
+        actionsContainer.insertBefore(openFolderBtn, dismissBtn);
+      }
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to add open folder button:', error);
+  }
+}
+
+function removeCancelButton(notification) {
+  try {
+    const cancelBtn = notification.querySelector('.cancel-btn');
+    if (cancelBtn) {
+      cancelBtn.remove();
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to remove cancel button:', error);
+  }
+}
+
+function addRetryButton(notification, downloadItem) {
+  try {
+    const actionsContainer = notification.querySelector('.download-notification-actions');
+    if (actionsContainer) {
+      // Remove cancel button if it exists
+      const cancelBtn = actionsContainer.querySelector('.cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.remove();
+      }
+      
+      // Add retry button if it doesn't exist
+      if (!actionsContainer.querySelector('.retry-btn')) {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'download-notification-btn retry-btn';
+        retryBtn.textContent = 'Retry';
+        retryBtn.dataset.action = 'retry';
+        retryBtn.dataset.downloadUrl = downloadItem.url;
+        
+        // Insert before the dismiss button
+        const dismissBtn = actionsContainer.querySelector('button:last-child');
+        actionsContainer.insertBefore(retryBtn, dismissBtn);
+      }
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to add retry button:', error);
+  }
+}
+
+async function cancelDownload(downloadId) {
+  try {
+    // Ensure ID is a string
+    const stringId = String(downloadId);
+    
+    if (window.novaAPI && window.novaAPI.invoke) {
+      const success = await window.novaAPI.invoke('cancel-download', stringId);
+      if (success) {
+        console.log('[Nova Renderer] Download cancelled successfully:', stringId);
+        // The notification will be updated via the download-updated event
+      } else {
+        console.warn('[Nova Renderer] Failed to cancel download:', stringId);
+        alert('Could not cancel download. It may have already completed.');
+      }
+    } else {
+      console.error('[Nova Renderer] NovaAPI not available for cancelling download');
+      alert('Could not cancel download - API not available');
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to cancel download:', error);
+    alert('Could not cancel download: ' + error.message);
+  }
+}
+
+function retryDownload(downloadItem) {
+  try {
+    // Navigate to the URL to retry the download
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      activeWebview.loadURL(downloadItem.url);
+    }
+    removeDownloadNotification(downloadItem.id);
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to retry download:', error);
+    alert('Could not retry download. Please try again manually.');
+  }
+}
+
+function retryDownloadUrl(url) {
+  try {
+    // Navigate to the URL to retry the download
+    const activeWebview = getActiveWebview();
+    if (activeWebview) {
+      activeWebview.loadURL(url);
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to retry download:', error);
+    alert('Could not retry download. Please try again manually.');
+  }
+}
+
+function openDownloadFolder(downloadPath) {
+  try {
+    if (window.novaAPI && window.novaAPI.invoke) {
+      window.novaAPI.invoke('open-download-location', downloadPath);
+    }
+  } catch (error) {
+    console.error('[Nova Renderer] Failed to open download folder:', error);
+    alert('Could not open download folder');
+  }
+}
+
+function removeDownloadNotification(downloadId) {
+  console.log('[Nova Renderer] Attempting to remove notification:', downloadId);
+  console.log('[Nova Renderer] Active notifications:', activeNotifications);
+  
+  const notification = activeNotifications.get(downloadId);
+  console.log('[Nova Renderer] Found notification element:', notification);
+  
+  if (notification) {
+    notification.classList.remove('show');
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+      activeNotifications.delete(downloadId);
+      console.log('[Nova Renderer] Successfully removed notification:', downloadId);
+    }, 300);
+  } else {
+    console.warn('[Nova Renderer] Could not find notification to remove:', downloadId);
+    // Try to find and remove by ID as fallback
+    const notificationElement = document.getElementById(`download-notification-${downloadId}`);
+    if (notificationElement) {
+      console.log('[Nova Renderer] Found notification by ID, removing:', downloadId);
+      notificationElement.classList.remove('show');
+      setTimeout(() => {
+        if (notificationElement.parentNode) {
+          notificationElement.parentNode.removeChild(notificationElement);
+        }
+      }, 300);
+    }
+  }
+}
+
+function getDownloadFileIcon(filename) {
+  const extension = filename.split('.').pop()?.toLowerCase() || '';
+  const iconMap = {
+    // Documents
+    'pdf': 'fiv-sqo fiv-icon-pdf',
+    'doc': 'fiv-sqo fiv-icon-doc', 'docx': 'fiv-sqo fiv-icon-docx',
+    'xls': 'fiv-sqo fiv-icon-xls', 'xlsx': 'fiv-sqo fiv-icon-xlsx',
+    'ppt': 'fiv-sqo fiv-icon-ppt', 'pptx': 'fiv-sqo fiv-icon-pptx',
+    'txt': 'fiv-sqo fiv-icon-txt',
+    'rtf': 'fiv-sqo fiv-icon-rtf',
+    'odt': 'fiv-sqo fiv-icon-odt',
+    'ods': 'fiv-sqo fiv-icon-ods',
+    'odp': 'fiv-sqo fiv-icon-odp',
+    
+    // Archives
+    'zip': 'fiv-sqo fiv-icon-zip', 'rar': 'fiv-sqo fiv-icon-rar', '7z': 'fiv-sqo fiv-icon-7z',
+    'tar': 'fiv-sqo fiv-icon-tar', 'gz': 'fiv-sqo fiv-icon-gz', 'bz2': 'fiv-sqo fiv-icon-bz2',
+    
+    // Images
+    'jpg': 'fiv-sqo fiv-icon-jpg', 'jpeg': 'fiv-sqo fiv-icon-jpg', 
+    'png': 'fiv-sqo fiv-icon-png', 'gif': 'fiv-sqo fiv-icon-gif', 
+    'bmp': 'fiv-sqo fiv-icon-bmp', 'svg': 'fiv-sqo fiv-icon-svg',
+    'tiff': 'fiv-sqo fiv-icon-tiff', 'webp': 'fiv-sqo fiv-icon-webp',
+    'ico': 'fiv-sqo fiv-icon-ico',
+    
+    // Video
+    'mp4': 'fiv-sqo fiv-icon-mp4', 'avi': 'fiv-sqo fiv-icon-avi', 
+    'mkv': 'fiv-sqo fiv-icon-mkv', 'mov': 'fiv-sqo fiv-icon-mov',
+    'wmv': 'fiv-sqo fiv-icon-wmv', 'flv': 'fiv-sqo fiv-icon-flv',
+    'webm': 'fiv-sqo fiv-icon-webm', 'm4v': 'fiv-sqo fiv-icon-m4v',
+    
+    // Audio
+    'mp3': 'fiv-sqo fiv-icon-mp3', 'wav': 'fiv-sqo fiv-icon-wav', 
+    'flac': 'fiv-sqo fiv-icon-flac', 'aac': 'fiv-sqo fiv-icon-aac',
+    'ogg': 'fiv-sqo fiv-icon-ogg', 'wma': 'fiv-sqo fiv-icon-wma',
+    
+    // Executables
+    'exe': 'fiv-sqo fiv-icon-exe', 'msi': 'fiv-sqo fiv-icon-msi',
+    'deb': 'fiv-sqo fiv-icon-deb', 'rpm': 'fiv-sqo fiv-icon-rpm',
+    'dmg': 'fiv-sqo fiv-icon-dmg', 'pkg': 'fiv-sqo fiv-icon-pkg',
+    'apk': 'fiv-sqo fiv-icon-apk',
+    
+    // Code files
+    'html': 'fiv-sqo fiv-icon-html', 'css': 'fiv-sqo fiv-icon-css', 
+    'js': 'fiv-sqo fiv-icon-js', 'ts': 'fiv-sqo fiv-icon-ts',
+    'json': 'fiv-sqo fiv-icon-json', 'xml': 'fiv-sqo fiv-icon-xml',
+    'php': 'fiv-sqo fiv-icon-php', 'py': 'fiv-sqo fiv-icon-py',
+    'java': 'fiv-sqo fiv-icon-java', 'cpp': 'fiv-sqo fiv-icon-cpp',
+    'c': 'fiv-sqo fiv-icon-c', 'h': 'fiv-sqo fiv-icon-h',
+    'cs': 'fiv-sqo fiv-icon-cs', 'rb': 'fiv-sqo fiv-icon-rb',
+    'go': 'fiv-sqo fiv-icon-go', 'swift': 'fiv-sqo fiv-icon-swift',
+    
+    // Other common types
+    'iso': 'fiv-sqo fiv-icon-iso',
+    'torrent': 'fiv-sqo fiv-icon-torrent',
+  };
+  
+  const iconClass = iconMap[extension];
+  
+  // Return span with CSS class if we have a mapping, otherwise return a default file icon
+  if (iconClass) {
+    return `<span class="${iconClass}" style="font-size: 42px; margin-right: 10px; opacity: 0.8;"></span>`;
+  }
+  
+  // Default file icon for unknown types
+  return `<span class="fiv-sqo fiv-icon-blank" style="font-size: 42px; margin-right: 10px; opacity: 0.8;"></span>`;
+}
+
+function formatDownloadSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Make functions globally available for onclick handlers
+window.removeDownloadNotification = removeDownloadNotification;
+window.openDownloadFolder = openDownloadFolder;
+window.retryDownload = retryDownload;
+window.cancelDownload = cancelDownload;

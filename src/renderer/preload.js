@@ -204,18 +204,27 @@ contextBridge.exposeInMainWorld('novaAPI', {
     },
     
     on: (channel, callback) => {
-      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar'];
+      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar', 'download-started', 'download-updated', 'download-completed'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, callback);
       }
     },
     
     removeAllListeners: (channel) => {
-      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar'];
+      const validChannels = ['open-nova-url', 'refresh-bookmarks-bar', 'download-started', 'download-updated', 'download-completed'];
       if (validChannels.includes(channel)) {
         ipcRenderer.removeAllListeners(channel);
       }
     }
+  },
+
+  // Download API
+  invoke: (channel, ...args) => {
+    const validChannels = ['get-downloads', 'clear-downloads', 'open-download-location', 'remove-download-item', 'cancel-download'];
+    if (validChannels.includes(channel)) {
+      return ipcRenderer.invoke(channel, ...args);
+    }
+    return Promise.reject(new Error(`Invalid channel: ${channel}`));
   },
   
   // System info

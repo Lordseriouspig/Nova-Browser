@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
+  <title>Nova Browser - Downloads</title>
+  <link rel="stylesheet" href="nova://shared/theme.css">
+  <link rel="stylesheet" href="nova://assets/file-icon-vivid.min.css">
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      margin: 0; 
+      padding: 40px; 
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+    }
+    
+    .container { 
+      max-width: 900px; 
+      margin: 0 auto; 
+      background: var(--bg-secondary); 
+      padding: 40px; 
+      border-radius: 10px; 
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-light);
+    }
+    
+    h1 { 
+      color: var(--text-primary); 
+      border-bottom: 2px solid var(--accent-color); 
+      padding-bottom: 10px; 
+      margin-bottom: 30px;
+    }
+    
+    .back-link { 
+      position: absolute; 
+      top: 20px; 
+      left: 20px; 
+      color: var(--accent-color); 
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .back-link:hover { 
+      background: var(--bg-secondary);
+      text-decoration: none;
+    }
+    
+    .downloads-controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .btn-primary {
+      background: var(--accent-color);
+      color: var(--text-on-accent);
+    }
+    
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .download-item {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+    
+    .download-item:hover {
+      background: var(--bg-secondary);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .download-icon {
+      width: 40px;
+      height: 40px;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 18px;
+    }
+    
+    .download-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .download-filename {
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 5px;
+      word-break: break-all;
+    }
+    
+    .download-url {
+      color: var(--text-secondary);
+      font-size: 0.9em;
+      margin-bottom: 5px;
+      word-break: break-all;
+    }
+    
+    .download-meta {
+      display: flex;
+      gap: 15px;
+      font-size: 0.8em;
+      color: var(--text-muted);
+    }
+    
+    .download-progress {
+      margin-top: 8px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-secondary);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 5px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-color);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-fill.indeterminate {
+      width: 100%;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--accent-color) 50%, 
+        transparent 100%);
+      animation: indeterminate 2s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(0); }
+      100% { transform: translateX(100%); }
+    }
+    
+    .download-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .action-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.8em;
+      color: var(--text-primary);
+      transition: all 0.3s ease;
+    }
+    
+    .action-btn:hover {
+      background: var(--accent-color);
+      color: var(--text-on-accent);
+    }
+    
+    .action-btn.danger {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .action-btn.danger:hover {
+      background: #c0392b;
+    }
+    
+    .empty-downloads {
+      text-align: center;
+      color: var(--text-muted);
+      margin: 40px 0;
+      font-size: 1.1em;
+    }
+
+    .empty-downloads.hidden {
+      display: none;
+    }
+    
+    .download-status {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    
+    .status-completed {
+      background: #d4edda;
+      color: #155724;
+    }
+    
+    .status-in-progress {
+      background: #cce7ff;
+      color: #004085;
+    }
+    
+    .status-cancelled {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    
+    .status-interrupted {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    [data-theme="dark"] .status-completed {
+      background: #155724;
+      color: #d4edda;
+    }
+
+    [data-theme="dark"] .status-in-progress {
+      background: #004085;
+      color: #cce7ff;
+    }
+
+    [data-theme="dark"] .status-cancelled {
+      background: #721c24;
+      color: #f8d7da;
+    }
+
+    [data-theme="dark"] .status-interrupted {
+      background: #856404;
+      color: #fff3cd;
+    }
+  </style>
+</head>
+<body>
+  <a href="nova://home" class="back-link">← Back to Home</a>
+  <div class="container">
+    <h1>Downloads</h1>
+    
+    <div class="downloads-controls">
+      <button onclick="refreshDownloads()" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw-icon lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Refresh</button>
+      <button onclick="clearAllDownloads()" class="btn btn-danger"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash2-icon lucide-trash-2"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear All</button>
+    </div>
+    
+    <div id="downloadsContainer">
+    </div>
+    
+    <div class="empty-downloads hidden" id="emptyMessage">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg> No downloads yet. Downloads will appear here when you download files.
+    </div>
+  </div>
+
+  <script src="nova://shared/theme.js"></script>
+  <script>
+    let downloads = [];
+
+    async function initializeDownloads() {
+      await loadDownloads();
+      renderDownloads();
+      
+      if (window.novaAPI && window.novaAPI.ipc) {
+        window.novaAPI.ipc.on('download-started', handleDownloadUpdate);
+        window.novaAPI.ipc.on('download-updated', handleDownloadUpdate);
+        window.novaAPI.ipc.on('download-completed', handleDownloadUpdate);
+      }
+    }
+
+    async function loadDownloads() {
+      try {
+        if (window.novaAPI && window.novaAPI.invoke) {
+          const result = await window.novaAPI.invoke('get-downloads');
+          downloads = Array.isArray(result) ? result : [];
+        } else {
+          downloads = [];
+        }
+      } catch (error) {
+        downloads = [];
+        const container = document.getElementById('downloadsContainer');
+        if (container) {
+          container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+              <h3>Error Loading Downloads</h3>
+              <p>Unable to load download history. Please try refreshing the page.</p>
+              <button onclick="loadDownloads()" class="btn btn-primary">Retry</button>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function handleDownloadUpdate(event, downloadItem) {
+      try {
+        if (!downloadItem || !downloadItem.id) {
+          return;
+        }
+        
+        const existingIndex = downloads.findIndex(d => d && d.id === downloadItem.id);
+        if (existingIndex !== -1) {
+          downloads[existingIndex] = downloadItem;
+        } else {
+          downloads.unshift(downloadItem);
+        }
+        renderDownloads();
+      } catch (error) {
+        setTimeout(() => loadDownloads().then(() => renderDownloads()), 1000);
+      }
+    }
+
+    function renderDownloads() {
+      try {
+        const container = document.getElementById('downloadsContainer');
+        const emptyMessage = document.getElementById('emptyMessage');
+        
+        if (!container || !emptyMessage) {
+          return;
+        }
+        
+        container.innerHTML = '';
+        
+        if (!Array.isArray(downloads) || downloads.length === 0) {
+          emptyMessage.classList.remove('hidden');
+          return;
+        }
+        
+        emptyMessage.classList.add('hidden');
+        
+        downloads.forEach((download, index) => {
+          try {
+            if (download && download.id) {
+              const item = createDownloadItem(download);
+              container.appendChild(item);
+            }
+          } catch (itemError) {
+            // Skip failed items
+          }
+        });
+      } catch (error) {
+        const container = document.getElementById('downloadsContainer');
+        if (container) {
+          container.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+              <h3>Error Displaying Downloads</h3>
+              <p>There was an error displaying the download list.</p>
+              <button onclick="refreshDownloads()" class="btn btn-primary">Refresh</button>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function createDownloadItem(download) {
+      try {
+        const item = document.createElement('div');
+        item.className = 'download-item';
+        
+        const fileExtension = getFileExtension(download.filename);
+        const icon = getFileIcon(fileExtension);
+        
+        let progress = 0;
+        if (download.totalBytes > 0) {
+          progress = Math.round((download.receivedBytes / download.totalBytes) * 100);
+        } else if (download.state === 'completed') {
+          progress = 100;
+        }
+        
+        const statusClass = `status-${download.state.replace('_', '-')}`;
+        const statusText = formatStatus(download.state);
+        
+        const receivedSize = formatFileSize(download.receivedBytes || 0);
+        const totalSize = download.totalBytes > 0 ? formatFileSize(download.totalBytes) : 'Unknown';
+        
+        item.innerHTML = `
+          <div class="download-icon">${icon}</div>
+          <div class="download-info">
+            <div class="download-filename">${escapeHtml(download.filename || 'Unknown file')}</div>
+            <div class="download-url">${escapeHtml(download.url || '')}</div>
+            <div class="download-meta">
+              <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-fold-icon lucide-calendar-fold" style="display: inline; margin-right: 4px;"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M21 17V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11Z"/><path d="M3 10h18"/><path d="M15 22v-4a2 2 0 0 1 2-2h4"/></svg>${formatDate(download.startTime)}</span>
+              <span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-chart-column-icon lucide-file-chart-column" style="display: inline; margin-right: 4px;"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 18v-1"/><path d="M12 18v-6"/><path d="M16 18v-3"/></svg>${receivedSize}${download.totalBytes > 0 ? ` / ${totalSize}` : ''}</span>
+              <span class="download-status ${statusClass}">${statusText}</span>
+            </div>
+            ${download.state === 'in_progress' && download.totalBytes > 0 ? `
+              <div class="download-progress">
+                <div>Progress: ${progress}%</div>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${progress}%"></div>
+                </div>
+              </div>
+            ` : download.state === 'in_progress' ? `
+              <div class="download-progress">
+                <div>Downloading... ${receivedSize}</div>
+                <div class="progress-bar">
+                  <div class="progress-fill indeterminate"></div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="download-actions">
+            ${download.state === 'completed' ? `
+              <button class="action-btn" onclick="openDownloadLocation('${escapeHtml(download.path || '')}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-search-icon lucide-folder-search" style="display: inline; margin-right: 4px;"><path d="M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4.1"/><path d="m21 21-1.9-1.9"/><circle cx="17" cy="17" r="3"/></svg>Show in Folder</button>
+            ` : ''}
+            ${download.state === 'interrupted' ? `
+              <button class="action-btn" onclick="retryDownload('${escapeHtml(download.url || '')}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw-icon lucide-refresh-ccw" style="display: inline; margin-right: 4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>Retry</button>
+            ` : ''}
+            <button class="action-btn danger" onclick="removeDownload('${download.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash2-icon lucide-trash-2" style="display: inline; margin-right: 4px;"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>
+          </div>
+        `;
+        
+        return item;
+      } catch (error) {
+        const errorItem = document.createElement('div');
+        errorItem.className = 'download-item';
+        errorItem.innerHTML = `
+          <div class="download-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-warning-icon lucide-file-warning"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+          <div class="download-info">
+            <div class="download-filename">Error displaying download</div>
+            <div class="download-url">An error occurred while rendering this download item</div>
+          </div>
+          <div class="download-actions">
+            <button class="action-btn danger" onclick="removeDownload('${download.id || 'error'}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash2-icon lucide-trash-2" style="display: inline; margin-right: 4px;"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>
+          </div>
+        `;
+        return errorItem;
+      }
+    }
+
+    function getFileIcon(extension) {
+      if (!extension) {
+        return `<span class="fiv-viv fiv-icon-blank" style="font-size: 24px;"></span>`;
+      }
+      
+      const ext = extension.toLowerCase();
+      const iconClass = `fiv-viv fiv-icon-${ext}`;
+      
+      return `<span class="${iconClass}" style="font-size: 24px;"></span>`;
+    }
+
+    function getFileExtension(filename) {
+      return filename.split('.').pop() || '';
+    }
+
+    function formatStatus(state) {
+      switch (state) {
+        case 'completed': return 'Completed';
+        case 'in_progress': return 'Downloading';
+        case 'cancelled': return 'Cancelled';
+        case 'interrupted': return 'Failed';
+        default: return state;
+      }
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatDate(dateString) {
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+      } catch (error) {
+        return dateString;
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function openDownloadLocation(downloadPath) {
+      try {
+        if (!downloadPath) {
+          alert('Download path not available');
+          return;
+        }
+        
+        if (window.novaAPI && window.novaAPI.invoke) {
+          await window.novaAPI.invoke('open-download-location', downloadPath);
+        } else {
+          alert('Could not open download location - API not available');
+        }
+      } catch (error) {
+        alert('Could not open download location: ' + error.message);
+      }
+    }
+
+    function retryDownload(downloadUrl) {
+      try {
+        if (!downloadUrl) {
+          alert('Download URL not available for retry');
+          return;
+        }
+        
+        if (window.novaAPI && window.novaAPI.navigation) {
+          window.novaAPI.navigation.goTo(downloadUrl);
+        } else if (window.parent && window.parent.navigateFromNova) {
+          window.parent.navigateFromNova(downloadUrl);
+        } else {
+          window.open(downloadUrl, '_blank');
+        }
+      } catch (error) {
+        alert('Could not retry download: ' + error.message);
+      }
+    }
+
+    async function removeDownload(downloadId) {
+      if (!confirm('Remove this download from the list?')) {
+        return;
+      }
+      
+      try {
+        if (window.novaAPI && window.novaAPI.invoke) {
+          await window.novaAPI.invoke('remove-download-item', downloadId);
+          downloads = downloads.filter(d => d.id !== downloadId);
+          renderDownloads();
+        }
+      } catch (error) {
+        alert('Could not remove download');
+      }
+    }
+
+    async function clearAllDownloads() {
+      if (!confirm('Clear all downloads from the list? This will not delete the downloaded files.')) {
+        return;
+      }
+      
+      try {
+        if (window.novaAPI && window.novaAPI.invoke) {
+          await window.novaAPI.invoke('clear-downloads');
+          downloads = [];
+          renderDownloads();
+        }
+      } catch (error) {
+        alert('Could not clear downloads');
+      }
+    }
+
+    async function refreshDownloads() {
+      await loadDownloads();
+      renderDownloads();
+    }
+
+    function navigateToUrl(url) {
+      if (window.novaAPI && window.novaAPI.navigation) {
+        window.novaAPI.navigation.goTo(url);
+      } else if (window.parent && window.parent.navigateFromNova) {
+        window.parent.navigateFromNova(url);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeDownloads();
+      if (window.setupBackLink) {
+        window.setupBackLink();
+      }
+    });
+  </script>
+</body>
+</html>
