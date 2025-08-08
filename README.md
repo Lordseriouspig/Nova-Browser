@@ -5,7 +5,7 @@ Yet another electron-based browser, Nova browser is designed to be an all-in-one
 
 ### Option 1: Pre-built (Recommended) (Windows Only)
 Visit the [Releases](https://github.com/Lordseriouspig/Nova-Browser/releases) page to download the latest version for your platform:
-- **Windows**: Download the `.exe` installer
+- **Windows**: Download the `.exe` installer or the `.zip` portable version.
 
 ### Option 2: Build from Source (All platforms)
 If you are on Mac or Linux, you will have to build from the source.

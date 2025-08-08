@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: './assets/icon/icon', // Electron will automatically append the correct extension
+    icon: './assets/icon/icon',
     name: 'Nova Browser',
     executableName: 'nova-browser',
   },
