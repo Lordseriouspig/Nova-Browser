@@ -579,7 +579,7 @@ if (!gotTheLock) {
 }
 
 function createWindow() {
-  const iconPath = { win32: path.join(__dirname, '../../assets', 'icon', 'icon-win.ico'), darwin: path.join(__dirname, '../../assets', 'icon', 'icon-mac.icns'), linux: path.join(__dirname, '../../assets', 'icon', 'icon-linux.png') }[process.platform];
+  const iconPath = { win32: path.join(__dirname, '../../assets', 'icon', 'icon.ico'), darwin: path.join(__dirname, '../../assets', 'icon', 'icon.icns'), linux: path.join(__dirname, '../../assets', 'icon', 'icon.png') }[process.platform];
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,

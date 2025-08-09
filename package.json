@@ -56,13 +56,13 @@
       }
     ],
     "win": {
-      "icon": "assets/icon/icon-win.ico"
+      "icon": "assets/icon/icon.ico"
     },
     "mac": {
-      "icon": "assets/icon/icon-mac.icns"
+      "icon": "assets/icon/icon.icns"
     },
     "linux": {
-      "icon": "assets/icon/icon-linux.png"
+      "icon": "assets/icon/icon.png"
     }
   }
 }

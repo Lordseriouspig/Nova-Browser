@@ -13,8 +13,8 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        iconUrl: 'https://raw.githubusercontent.com/Lordseriouspig/Nova-Browser/main/assets/icon/icon-win.ico',
-        setupIcon: './assets/icon/icon-win.ico',
+        iconUrl: 'https://raw.githubusercontent.com/Lordseriouspig/Nova-Browser/main/assets/icon/icon.ico',
+        setupIcon: './assets/icon/icon.ico',
         loadingGif: './assets/banner.png',
       },
     },
@@ -22,14 +22,14 @@ module.exports = {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
       config: {
-        icon: './assets/icon/icon-mac.icns',
+        icon: './assets/icon/icon.icns',
       },
     },
     {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          icon: './assets/icon/icon-linux.png',
+          icon: './assets/icon/icon.png',
           maintainer: 'Lordseriouspig',
           homepage: 'https://github.com/Lordseriouspig/Nova-Browser',
         },
@@ -39,7 +39,7 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {
         options: {
-          icon: './assets/icon/icon-linux.png',
+          icon: './assets/icon/icon.png',
           maintainer: 'Lordseriouspig',
           homepage: 'https://github.com/Lordseriouspig/Nova-Browser',
         },
