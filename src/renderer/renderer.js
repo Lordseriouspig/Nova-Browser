@@ -537,15 +537,96 @@ document.addEventListener('DOMContentLoaded', () => {
       const tabButton = document.querySelector(`.tab[data-id="${tabId}"]`);
       if (tabButton) {
         const closeBtn = tabButton.querySelector('.tab-close');
+        const faviconImg = tabButton.querySelector('.tab-favicon');
         
         const title = event.title || 'New Tab';
         
         if (closeBtn) {
           closeBtn.remove();
-          tabButton.innerText = title;
+          tabButton.innerHTML = '';
+          if (faviconImg) {
+            tabButton.appendChild(faviconImg);
+          }
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'tab-title';
+          titleSpan.textContent = title;
+          tabButton.appendChild(titleSpan);
           tabButton.appendChild(closeBtn);
         } else {
-          tabButton.innerText = title;
+          tabButton.innerHTML = '';
+          if (faviconImg) {
+            tabButton.appendChild(faviconImg);
+          }
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'tab-title';
+          titleSpan.textContent = title;
+          tabButton.appendChild(titleSpan);
+        }
+      }
+    });
+
+    webview.addEventListener('page-favicon-updated', async (event) => {
+      const tabId = webview.dataset.id;
+      const tabButton = document.querySelector(`.tab[data-id="${tabId}"]`);
+      if (tabButton) {
+        let faviconImg = tabButton.querySelector('.tab-favicon');
+        
+        if (!faviconImg) {
+          faviconImg = document.createElement('img');
+          faviconImg.className = 'tab-favicon';
+          faviconImg.width = 16;
+          faviconImg.height = 16;
+        }
+        
+        if (event.favicons && event.favicons.length > 0) {
+          // Use the first favicon URL
+          faviconImg.src = event.favicons[0];
+          faviconImg.onerror = () => {
+            // Fallback to Google's favicon service
+            const url = webview.src || webview.dataset.novaUrl;
+            if (url && !url.startsWith('nova://')) {
+              try {
+                const domain = new URL(url).hostname;
+                faviconImg.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+              } catch (e) {
+                // If URL parsing fails, use default
+                faviconImg.src = getDefaultFaviconDataURI();
+              }
+            } else {
+              faviconImg.src = getDefaultFaviconDataURI();
+            }
+          };
+        } else {
+          // No favicon provided, try Google's service or use default
+          const url = webview.src || webview.dataset.novaUrl;
+          if (url && !url.startsWith('nova://')) {
+            try {
+              const domain = new URL(url).hostname;
+              faviconImg.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+              faviconImg.onerror = () => {
+                faviconImg.src = getDefaultFaviconDataURI();
+              };
+            } catch (e) {
+              faviconImg.src = getDefaultFaviconDataURI();
+            }
+          } else if (url && url.startsWith('nova://')) {
+            // For nova pages, get the proper favicon
+            getFavicon(url).then(favicon => {
+              faviconImg.src = favicon;
+            }).catch(() => {
+              faviconImg.src = getDefaultFaviconDataURI();
+            });
+          } else {
+            faviconImg.src = getDefaultFaviconDataURI();
+          }
+        }
+        
+        // Update tab structure with favicon
+        const closeBtn = tabButton.querySelector('.tab-close');
+        const titleSpan = tabButton.querySelector('.tab-title');
+        
+        if (titleSpan && !tabButton.querySelector('.tab-favicon')) {
+          tabButton.insertBefore(faviconImg, titleSpan);
         }
       }
     });
@@ -671,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         id: Date.now().toString(),
         url: url,
         title: title,
-        favicon: getFaviconForUrl(url),
+        favicon: await getFavicon(url),
         timestamp: new Date().toISOString(),
         visitCount: 1
       };
@@ -713,7 +794,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Setup events for the initial webview - use async initialization
   async function initializeFirstTab() {
     const initialWebview = document.querySelector('.tab-view[data-id="tab-0"]');
-    if (initialWebview) {
+    const initialTab = document.querySelector('.tab[data-id="tab-0"]');
+    
+    if (initialWebview && initialTab) {
       const preloadPath = './preload.js';
       initialWebview.setAttribute('preload', preloadPath);
       
@@ -723,6 +806,16 @@ document.addEventListener('DOMContentLoaded', () => {
       setupWebviewListener(initialWebview);
       setupWebviewEvents(initialWebview);
       urlInput.value = homepageUrl;
+      
+      // Set default favicon for nova:// home page
+      const faviconImg = initialTab.querySelector('.tab-favicon');
+      if (faviconImg && homepageUrl.startsWith('nova://')) {
+        getFavicon(homepageUrl).then(favicon => {
+          faviconImg.src = favicon;
+        }).catch(() => {
+          faviconImg.src = getDefaultFaviconDataURI();
+        });
+      }
     }
   }
 
@@ -735,8 +828,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabButton = document.createElement('button');
     tabButton.className = 'tab';
-    tabButton.innerText = 'New Tab';
     tabButton.dataset.id = tabId;
+    
+    // Create favicon element
+    const faviconImg = document.createElement('img');
+    faviconImg.className = 'tab-favicon';
+    faviconImg.width = 16;
+    faviconImg.height = 16;
+    faviconImg.src = getDefaultFaviconDataURI();
+    
+    // Create title span
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'tab-title';
+    titleSpan.textContent = 'New Tab';
+    
+    tabButton.appendChild(faviconImg);
+    tabButton.appendChild(titleSpan);
 
     const webview = document.createElement('webview');
     webview.src = await generateHomePage();
@@ -912,9 +1019,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Default SVG icon for pages without favicons
   function getDefaultFaviconSVG() {
     const iconColor = getThemeIconColor();
-    return `data:image/svg+xml,${encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe-icon lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-    `)}`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+      <path d="M2 12h20"/>
+    </svg>`;
+  }
+
+  // Get default favicon as data URI for direct use in img src
+  function getDefaultFaviconDataURI() {
+    return 'data:image/svg+xml;base64,' + btoa(getDefaultFaviconSVG());
   }
 
   // Helper function to get theme-appropriate icon color
@@ -962,6 +1076,15 @@ document.addEventListener('DOMContentLoaded', () => {
           </svg>
         `)}`;
       }
+      if (url.includes('nova://downloads')) {
+        return `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7,10 12,15 17,10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        `)}`;
+      }
       if (url.includes('nova://home')) {
         return `data:image/svg+xml,${encodeURIComponent(`
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -982,48 +1105,46 @@ document.addEventListener('DOMContentLoaded', () => {
         `)}`;
       }
 
-      // For external URLs, try to get favicon through webview API or use fallback
+      // Try multiple favicon sources for better transparency support
       const domain = new URL(url).hostname;
       
-      // Use a simpler approach with data URI fallback
-      try {
-        // Try Google's favicon service as the primary source
-        const googleFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-        
-        // Create a test image to check if the favicon loads
-        const testResult = await new Promise((resolve) => {
-          const testImg = new Image();
-          testImg.crossOrigin = 'anonymous';
-          
-          const timeout = setTimeout(() => {
-            resolve(null);
-          }, 2000);
-          
-          testImg.onload = () => {
-            clearTimeout(timeout);
-            resolve(googleFavicon);
+      // Try different favicon sources in order of preference
+      const faviconSources = [
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`, // Often has better transparency
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+        `https://${domain}/favicon.ico`,
+        `https://${domain}/favicon.png`
+      ];
+      
+      // Test favicon sources one by one
+      for (const faviconUrl of faviconSources) {
+        const result = await new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            resolve(faviconUrl);
           };
-          
-          testImg.onerror = () => {
-            clearTimeout(timeout);
+          img.onerror = () => {
             resolve(null);
           };
+          img.src = faviconUrl;
           
-          testImg.src = googleFavicon;
+          // Shorter timeout for each attempt
+          setTimeout(() => {
+            resolve(null);
+          }, 1500);
         });
         
-        if (testResult) {
-          return testResult;
+        if (result) {
+          return result;
         }
-      } catch (error) {
-        console.warn('Failed to load favicon from Google service:', error);
       }
       
-      // If all external sources fail, use our default SVG
-      return getDefaultFaviconSVG();
+      // If all favicon sources fail, use our default SVG
+      return getDefaultFaviconDataURI();
     } catch (error) {
       console.warn('Error getting favicon for', url, error);
-      return getDefaultFaviconSVG();
+      return getDefaultFaviconDataURI();
     }
   }
 

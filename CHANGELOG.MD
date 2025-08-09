@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Download management and downloading capability
+- Favicons are now visible in tabs and history page
 
 ## [0.1.0] - 2025-08-01
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova:; font-src 'self' nova:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nova:; script-src 'self' 'unsafe-inline' nova:; style-src 'self' 'unsafe-inline' nova:; img-src 'self' data: nova: https://www.google.com https://icons.duckduckgo.com https:; font-src 'self' nova:; connect-src 'self' https:;">
   <title>Nova Browser - History</title>
   <link rel="stylesheet" href="nova://shared/theme.css">
   <style>
@@ -60,6 +60,7 @@
       height: 16px; 
       flex-shrink: 0;
       margin-top: 2px;
+      border-radius: 2px;
     }
     .history-info { 
       flex: 1; 
@@ -246,12 +247,23 @@
       // Remove existing entry for this URL to avoid duplicates
       historyItems = historyItems.filter(item => item.url !== url);
 
+      // Get favicon - use provided one or fetch it
+      let itemFavicon = favicon;
+      if (!itemFavicon) {
+        try {
+          itemFavicon = await getFavicon(url);
+        } catch (error) {
+          console.warn('Failed to get favicon for', url, error);
+          itemFavicon = getDefaultFaviconSVG();
+        }
+      }
+
       // Add new entry at the beginning
       const historyItem = {
         id: Date.now().toString(),
         url: url,
         title: title || url,
-        favicon: favicon || getFaviconForUrl(url),
+        favicon: itemFavicon,
         timestamp: new Date().toISOString(),
         visitCount: 1
       };
@@ -266,15 +278,152 @@
       await saveHistory();
     }
 
-    // Get favicon for URL
+    // Helper function to get theme-appropriate icon color
+    function getThemeIconColor() {
+      const theme = document.documentElement.getAttribute('data-theme');
+      return theme === 'dark' ? '#ffffff' : '#000000';
+    }
+
+    // Default SVG icon for pages without favicons
+    function getDefaultFaviconSVG() {
+      const iconColor = getThemeIconColor();
+      return `data:image/svg+xml,${encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+          <path d="M2 12h20"/>
+        </svg>
+      `)}`;
+    }
+
+    async function getFavicon(url) {
+      try {
+        // Get the current theme color for SVG icons
+        const iconColor = getThemeIconColor();
+        
+        // For nova:// pages, use predefined icons as data URIs with theme-appropriate colors
+        if (url.includes('nova://settings')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://bookmarks')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://history')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M12 7v5l4 2"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://about')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4"/>
+              <path d="M12 8h.01"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://downloads')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7,10 12,15 17,10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://home')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+              <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            </svg>
+          `)}`;
+        }
+        if (url.includes('nova://')) {
+          return `data:image/svg+xml,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.341 6.484A10 10 0 0 1 10.266 21.85"/>
+              <path d="M3.659 17.516A10 10 0 0 1 13.74 2.152"/>
+              <circle cx="12" cy="12" r="3"/>
+              <circle cx="19" cy="5" r="2"/>
+              <circle cx="5" cy="19" r="2"/>
+            </svg>
+          `)}`;
+        }
+
+        // Try multiple favicon sources for better transparency support
+        const domain = new URL(url).hostname;
+        
+        // Try different favicon sources in order of preference
+        const faviconSources = [
+          `https://icons.duckduckgo.com/ip3/${domain}.ico`, // Often has better transparency
+          `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+          `https://${domain}/favicon.ico`,
+          `https://${domain}/favicon.png`
+        ];
+        
+        // Test favicon sources one by one
+        for (const faviconUrl of faviconSources) {
+          const result = await new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              resolve(faviconUrl);
+            };
+            img.onerror = () => {
+              resolve(null);
+            };
+            img.src = faviconUrl;
+            
+            // Shorter timeout for each attempt
+            setTimeout(() => {
+              resolve(null);
+            }, 1500);
+          });
+          
+          if (result) {
+            return result;
+          }
+        }
+        
+        // If all favicon sources fail, use our default SVG
+        return getDefaultFaviconSVG();
+      } catch (error) {
+        console.warn('Error getting favicon for', url, error);
+        return getDefaultFaviconSVG();
+      }
+    }
+
+    // Get favicon for URL (keeping for backward compatibility)
     function getFaviconForUrl(url) {
-      if (url.includes('google.com')) return '🔍';
-      if (url.includes('github.com')) return '🐙';
-      if (url.includes('youtube.com')) return '📺';
-      if (url.includes('wikipedia.org')) return '📖';
-      if (url.includes('stackoverflow.com')) return '💬';
-      if (url.includes('nova://home')) return '🌟';
-      return '🌐';
+      // For nova:// URLs, use specific icons
+      if (url.startsWith('nova://')) {
+        if (url.includes('nova://home')) {
+          return getFavicon(url);
+        }
+        return getFavicon(url);
+      }
+      
+      try {
+        const domain = new URL(url).hostname;
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+      } catch (e) {
+        // Fallback to default icon for invalid URLs
+        return getDefaultFaviconSVG();
+      }
     }
 
     // Format timestamp to relative time
@@ -371,15 +520,67 @@
       historyItem.className = 'history-item';
       historyItem.onclick = () => navigateToUrl(item.url);
 
-      historyItem.innerHTML = `
-        <div class="history-favicon">${item.favicon}</div>
-        <div class="history-info">
-          <div class="history-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
-          <div class="history-url" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</div>
-        </div>
-        <div class="history-time">${formatTimeAgo(item.timestamp)}</div>
-        <button class="delete-item" onclick="event.stopPropagation(); deleteHistoryItem('${item.id}')">✕</button>
-      `;
+      // Create favicon element with proper error handling
+      const faviconImg = document.createElement('img');
+      faviconImg.className = 'history-favicon';
+      faviconImg.src = item.favicon;
+      faviconImg.alt = 'favicon';
+      faviconImg.onerror = function() {
+        // Try fallback favicon sources
+        if (this.src.includes('duckduckgo')) {
+          // Try Google's service
+          try {
+            const domain = new URL(item.url).hostname;
+            this.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+          } catch (e) {
+            this.src = getDefaultFaviconSVG();
+          }
+        } else if (this.src.includes('google.com/s2/favicons')) {
+          // Try direct domain favicon
+          try {
+            const domain = new URL(item.url).hostname;
+            this.src = `https://${domain}/favicon.ico`;
+          } catch (e) {
+            this.src = getDefaultFaviconSVG();
+          }
+        } else {
+          // Final fallback
+          this.src = getDefaultFaviconSVG();
+        }
+      };
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'history-info';
+      
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'history-title';
+      titleDiv.title = item.title;
+      titleDiv.textContent = item.title;
+      
+      const urlDiv = document.createElement('div');
+      urlDiv.className = 'history-url';
+      urlDiv.title = item.url;
+      urlDiv.textContent = item.url;
+      
+      infoDiv.appendChild(titleDiv);
+      infoDiv.appendChild(urlDiv);
+      
+      const timeDiv = document.createElement('div');
+      timeDiv.className = 'history-time';
+      timeDiv.textContent = formatTimeAgo(item.timestamp);
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-item';
+      deleteBtn.textContent = '✕';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteHistoryItem(item.id);
+      };
+      
+      historyItem.appendChild(faviconImg);
+      historyItem.appendChild(infoDiv);
+      historyItem.appendChild(timeDiv);
+      historyItem.appendChild(deleteBtn);
 
       return historyItem;
     }
