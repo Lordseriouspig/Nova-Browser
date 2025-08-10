@@ -1001,7 +1001,8 @@ webview {
 }
 
 #new-tab-btn:hover,
-#new-group-btn:hover {
+#new-group-btn:hover,
+#ai-organize-btn:hover {
   background: var(--new-tab-hover);
   color: var(--text-primary);
   border-color: var(--accent-color);
@@ -1009,13 +1010,82 @@ webview {
 }
 
 #new-tab-btn:active,
-#new-group-btn:active {
+#new-group-btn:active,
+#ai-organize-btn:active {
   transform: scale(0.95);
   background: var(--button-bg);
 }
 
+#ai-organize-btn {
+  /* Inherit same sizing as other buttons */
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  font-size: 12px;
+  
+  /* Custom AI styling */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 1px solid #667eea;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+#ai-organize-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+#ai-organize-btn:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  color: white;
+  border-color: #5a67d8;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+#ai-organize-btn:hover::before {
+  left: 100%;
+}
+
+#ai-organize-btn.loading {
+  animation: aiPulse 1.5s ease-in-out infinite;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background-size: 200% 200%;
+  animation: aiPulse 1.5s ease-in-out infinite, gradientShift 2s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8; 
+    transform: scale(1.02);
+  }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 #new-tab-btn svg,
-#new-group-btn svg {
+#new-group-btn svg,
+#ai-organize-btn svg {
   width: 16px;
   height: 16px;
   transition: transform 0.2s ease;
@@ -1263,4 +1333,235 @@ webview {
 .tab.dragging {
   opacity: 0.5;
   transform: rotate(3deg);
+}
+
+/* AI Privacy Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0;
+  min-width: 450px;
+  max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-icon {
+  width: 24px;
+  height: 24px;
+  stroke: white;
+}
+
+.modal-body {
+  padding: 24px;
+  line-height: 1.6;
+}
+
+.modal-body p {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-body strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  background: var(--bg-tertiary);
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--button-hover);
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+.btn-tertiary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tertiary:hover {
+  background: var(--button-hover);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom Alert Modal */
+.alert-modal {
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.alert-header {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+  color: white;
+}
+
+.alert-header .modal-icon {
+  stroke: white;
+}
+
+.alert-body {
+  padding: 24px;
+  text-align: center;
+}
+
+.alert-body p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.alert-footer {
+  justify-content: center;
+  padding: 20px 24px;
+}
+
+.alert-footer .btn-primary {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+  min-width: 80px;
+}
+
+.alert-footer .btn-primary:hover {
+  background: linear-gradient(135deg, #4dabf7 0%, #0c7cd5 100%);
+}
+
+/* Alert types - can be applied to change the theme */
+.alert-modal.success .alert-header {
+  background: linear-gradient(135deg, #00b894 0%, #55a3ff 100%);
+}
+
+.alert-modal.success .alert-footer .btn-primary {
+  background: linear-gradient(135deg, #00b894 0%, #55a3ff 100%);
+}
+
+.alert-modal.success .alert-footer .btn-primary:hover {
+  background: linear-gradient(135deg, #00a085 0%, #4dabf7 100%);
+}
+
+.alert-modal.warning .alert-header {
+  background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+}
+
+.alert-modal.warning .alert-footer .btn-primary {
+  background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+}
+
+.alert-modal.warning .alert-footer .btn-primary:hover {
+  background: linear-gradient(135deg, #f39c12 0%, #d63031 100%);
+}
+
+.alert-modal.info .alert-header {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+.alert-modal.info .alert-footer .btn-primary {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+.alert-modal.info .alert-footer .btn-primary:hover {
+  background: linear-gradient(135deg, #4dabf7 0%, #0c7cd5 100%);
 }
