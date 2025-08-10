@@ -596,7 +596,12 @@ body {
 .bookmark-folder-arrow {
   font-size: 10px;
   margin-left: auto;
-  transition: transform 0.2s ease;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.bookmark-folder-arrow.expanded {
+  transform: rotate(90deg);
 }
 
 .bookmark-folder-dropdown {
@@ -711,15 +716,152 @@ webview {
   display: flex;
   background: var(--tab-bg);
   padding: 4px;
-  align-items: center;
+  align-items: flex-start;
   border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 200px;
+}
+
+.tab-groups-container {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+
+.standalone-tab {
+  margin-right: 8px;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  min-width: 250px;
+  flex-shrink: 0;
+}
+
+.tab-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-light);
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab-group-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.tab-group-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tab-group-color.default { background-color: #6366f1; }
+.tab-group-color.red { background-color: #ef4444; }
+.tab-group-color.green { background-color: #22c55e; }
+.tab-group-color.blue { background-color: #3b82f6; }
+.tab-group-color.yellow { background-color: #eab308; }
+.tab-group-color.purple { background-color: #8b5cf6; }
+.tab-group-color.pink { background-color: #ec4899; }
+.tab-group-color.orange { background-color: #f97316; }
+
+.tab-group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  flex: 1;
+}
+
+.tab-group-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.tab-group-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.tab-group-collapse,
+.tab-group-menu {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.tab-group-collapse:hover,
+.tab-group-menu:hover {
+  background: var(--button-hover);
+  color: var(--text-primary);
+}
+
+.tab-group-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+}
+
+.tab-group.collapsed .tab-group-tabs {
+  display: none;
+}
+
+.tab-group.collapsed .tab-group-collapse {
+  transform: rotate(90deg);
+}
+
+/* Old tab group drag feedback */
+.tab-group.drag-over {
+  background: rgba(120, 180, 255, 0.1);
+  border: 2px dashed var(--accent-color);
+}
+
+.tab-group.drag-over .tab-group-header {
+  background: var(--accent-color);
+  color: white;
+}
+
+.tab-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .tab {
   background: var(--tab-item-bg);
   color: var(--text-primary);
   border: none;
-  margin-right: 4px;
+  margin: 0;
   padding: 6px 10px;
   cursor: pointer;
   display: flex;
@@ -728,8 +870,12 @@ webview {
   transition: all 0.2s ease;
   border: 1px solid transparent;
   gap: 6px;
-  max-width: 200px;
   min-width: 120px;
+  max-width: 200px;
+  min-height: 32px;
+  position: relative;
+  user-select: none;
+  flex-shrink: 0;
 }
 
 .tab-favicon {
@@ -745,11 +891,13 @@ webview {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  font-size: 13px;
 }
 
 .tab.active {
   background: var(--tab-active-bg);
   border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
 }
 
 .tab:hover:not(.active) {
@@ -762,6 +910,13 @@ webview {
   padding: 0 4px;
   border-radius: 2px;
   transition: all 0.2s ease;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.tab:hover .tab-close {
+  opacity: 1;
+  visibility: visible;
 }
 
 .tab-close:hover {
@@ -769,12 +924,72 @@ webview {
   color: #ff6b6b;
 }
 
-#new-tab-btn {
+.tab.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+}
+
+/* Advanced drag system - tab is temporarily removed from layout during drag */
+
+.tab-drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: rotate(3deg);
+  opacity: 0.9;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  transition: none;
+}
+
+.tab-drop-indicator {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: var(--accent-color);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 999;
+}
+
+.tab-drop-indicator.visible {
+  opacity: 1;
+}
+
+/* Smooth tab repositioning animations */
+.tab {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.tab.repositioning {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Container for smooth layout transitions */
+.tab-group-tabs, .tab-groups-container {
+  transition: all 0.2s ease;
+}
+
+/* Gap filling animation when tab is lifted */
+.tab.filling-gap {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-group.drag-over {
+  background: var(--accent-color);
+  opacity: 0.8;
+}
+
+.tab-group.drag-over .tab-group-header {
+  background: var(--accent-color);
+  color: white;
+}
+
+#new-tab-btn,
+#new-group-btn {
   background: var(--new-tab-bg);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
   padding: 6px 8px;
-  margin-left: 4px;
   border-radius: 4px;
   cursor: pointer;
   display: flex;
@@ -782,21 +997,25 @@ webview {
   justify-content: center;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  font-size: 12px;
 }
 
-#new-tab-btn:hover {
+#new-tab-btn:hover,
+#new-group-btn:hover {
   background: var(--new-tab-hover);
   color: var(--text-primary);
   border-color: var(--accent-color);
   transform: scale(1.05);
 }
 
-#new-tab-btn:active {
+#new-tab-btn:active,
+#new-group-btn:active {
   transform: scale(0.95);
   background: var(--button-bg);
 }
 
-#new-tab-btn svg {
+#new-tab-btn svg,
+#new-group-btn svg {
   width: 16px;
   height: 16px;
   transition: transform 0.2s ease;
@@ -820,4 +1039,228 @@ webview {
 
 .tab-view.active {
   display: flex;
+}
+
+/* Tab Group Context Menu */
+.tab-group-context-menu {
+  position: absolute;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px 0;
+  display: none;
+}
+
+.tab-group-context-menu.show {
+  display: block;
+}
+
+.tab-group-context-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-group-context-item:hover {
+  background: var(--button-hover);
+}
+
+.tab-group-context-item.danger:hover {
+  background: var(--danger-color);
+  color: white;
+}
+
+.tab-group-context-separator {
+  height: 1px;
+  background: var(--border-light);
+  margin: 4px 0;
+}
+
+.tab-group-context-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tab-group-context-item.disabled:hover {
+  background: transparent;
+}
+
+.tab-group-context-colors {
+  display: flex;
+  padding: 8px 12px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  border-color: var(--accent-color);
+}
+
+.color-option.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--bg-secondary), 0 0 0 3px var(--accent-color);
+}
+
+/* Tab Group Color Picker */
+.tab-group-color-picker {
+  position: fixed;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  padding: 8px;
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.tab-group-color-picker.show {
+  display: grid;
+}
+
+.tab-group-color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-group-color-option:hover {
+  transform: scale(1.1);
+  border-color: var(--accent-color);
+}
+
+.tab-group-color-option.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--accent-color);
+}
+
+/* Color classes for tab groups */
+.default { background-color: #666666; }
+.red { background-color: #ff4444; }
+.green { background-color: #44ff44; }
+.blue { background-color: #4444ff; }
+.yellow { background-color: #ffff44; }
+.purple { background-color: #ff44ff; }
+.pink { background-color: #ff88cc; }
+.orange { background-color: #ff8844; }
+
+/* Custom Prompt Dialog */
+.custom-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.custom-prompt-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  box-shadow: var(--shadow);
+}
+
+.custom-prompt-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.custom-prompt-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.custom-prompt-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.custom-prompt-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.custom-prompt-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.custom-prompt-button.primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+.custom-prompt-button.primary:hover {
+  background: var(--accent-hover);
+}
+
+.custom-prompt-button.secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+.custom-prompt-button.secondary:hover {
+  background: var(--button-hover);
+}
+
+/* Drag and drop visual feedback */
+.tab-groups-container.drag-over-standalone {
+  background: rgba(120, 180, 255, 0.1);
+  border: 2px dashed var(--accent-color);
+  border-radius: 6px;
+}
+
+.tab-group.drag-over {
+  background: rgba(120, 180, 255, 0.1);
+  border: 2px dashed var(--accent-color);
+}
+
+.tab.dragging {
+  opacity: 0.5;
+  transform: rotate(3deg);
 }

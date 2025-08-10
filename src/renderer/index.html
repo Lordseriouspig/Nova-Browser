@@ -13,11 +13,14 @@
 </head>
 <body>
   <div id="tabs">
-    <button class="tab active" data-id="tab-0">
-      <img alt="Tab Favicon" class="tab-favicon" width="16" height="16" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0ibTEyIDMtMS41IDMuNUwtNiA1LjI1IDEyIDEwLjMzbDYtNS4wOEwxMy41IDYuNUwxMiAzWiIgZmlsbD0iIzY2NjY2NiIvPgo8cGF0aCBkPSJtNiA5IDYgMTMgNi0xM3YtM2wtNi02LTYgNnYzWiIgZmlsbD0iIzY2NjY2NiIvPgo8L3N2Zz4K" />
-      <span class="tab-title">New Tab</span>
-    </button>
-    <button id="new-tab-btn" title="New Tab"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+    <div class="tab-groups-container">
+      <!-- Tab groups will be dynamically created here -->
+    </div>
+    <div class="tab-controls">
+      <button id="new-tab-btn" title="New Tab"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+      <button id="new-group-btn" title="New Tab Group"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 9h6m-6 4h6"/></svg></button>
+    </div>
+  </div>
   </div>
 
   <div id="toolbar">
