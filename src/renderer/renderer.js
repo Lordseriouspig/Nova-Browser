@@ -504,19 +504,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!url.startsWith('http')) url = 'https://' + url;
       }
       
-      // Check for blocked sites in focus mode - show warning but allow navigation
+      // Check for enhanced blocking in focus mode
       if (currentMode === 'focus') {
-        console.debug('[Nova] Focus mode active, checking manual navigation to:', url);
         try {
-          if (await isWebsiteBlocked(url)) {
+          const blockResult = await isWebsiteBlockedEnhanced(url);
+          
+          if (blockResult.shouldBlock) {
             const hostname = extractDomain(url);
-            console.debug('[Nova] Manual navigation would be blocked in strict mode:', hostname, 'allowing navigation but showing notification');
+            // Don't navigate, show blocked overlay instead
+            showBlockedSiteOverlay(activeWebview, hostname);
+            return;
+          } else if (blockResult.showWarning) {
+            const hostname = extractDomain(url);
             showFocusWarningNotification(hostname);
-          } else {
-            console.debug('[Nova] Manual navigation allowed for:', extractDomain(url));
+            // Continue with navigation
           }
         } catch (error) {
-          console.warn('[Nova] Error checking URL for blocking:', error);
+          console.warn('[Nova] Error checking URL for enhanced blocking:', error);
         }
       }
       
@@ -768,60 +772,78 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Block navigation for focus mode - optional visual feedback only
+    // Block navigation for focus mode with pomodoro integration
     webview.addEventListener('will-navigate', async (event) => {
-      console.debug('[Nova] will-navigate event triggered:', event.url, 'current mode:', currentMode);
-      
       if (currentMode === 'focus') {
         const currentUrl = event.url;
-        console.debug('[Nova] Focus mode active, checking if URL should be blocked:', currentUrl);
         
         try {
-          if (await isWebsiteBlocked(currentUrl)) {
+          // Check enhanced blocking which returns { shouldBlock, showWarning }
+          const blockResult = await isWebsiteBlockedEnhanced(currentUrl);
+          
+          if (blockResult.shouldBlock) {
             const hostname = extractDomain(currentUrl);
-            console.debug('[Nova] URL would be blocked in strict mode:', hostname, 'allowing navigation but showing notification');
+            console.log('[Nova] Blocking navigation to:', hostname, '(Focus Mode + Pomodoro Active)');
             
-            // Just show a notification but allow navigation
+            // Prevent the navigation with multiple methods
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Show the enhanced blocked site overlay
+            showBlockedSiteOverlay(webview, hostname);
+            
+            // Then stop the webview loading as fallback
+            setTimeout(() => {
+              if (webview.src !== 'about:blank') {
+                webview.stop();
+                webview.src = 'about:blank';
+              }
+            }, 100);
+            
+            // Immediately return to avoid any further processing
+            return false;
+          } else if (blockResult.showWarning) {
+            // Show warning for distracting sites in Focus Mode without Pomodoro
+            const hostname = extractDomain(currentUrl);
             showFocusWarningNotification(hostname);
-          } else {
-            console.debug('[Nova] Navigation allowed for:', extractDomain(currentUrl));
           }
         } catch (error) {
           console.error('[Nova] Error checking website blocking:', error);
         }
-      } else {
-        console.debug('[Nova] Not in focus mode, allowing navigation');
       }
     });
 
-    // Also block new-window events for focus mode
+    // Also block new-window events for focus mode with pomodoro integration
     webview.addEventListener('new-window', async (event) => {
-      console.debug('[Nova] new-window event triggered:', event.url, 'current mode:', currentMode);
-      
       if (currentMode === 'focus') {
         const currentUrl = event.url;
-        console.debug('[Nova] Focus mode active, checking if new window URL should be blocked:', currentUrl);
         
         try {
-          if (await isWebsiteBlocked(currentUrl)) {
+          // Check enhanced blocking which returns { shouldBlock, showWarning }
+          const blockResult = await isWebsiteBlockedEnhanced(currentUrl);
+          
+          if (blockResult.shouldBlock) {
             const hostname = extractDomain(currentUrl);
-            console.debug('[Nova] New window blocked for:', hostname, 'preventing event and showing overlay');
+            console.log('[Nova] BLOCKING NEW WINDOW to:', hostname, '(Focus Mode + Pomodoro Active)');
             
-            // Prevent the new window
+            // Prevent the new window with multiple methods
             event.preventDefault();
             event.stopPropagation();
+            event.returnValue = false;
             
             // Show the blocked site overlay
             showBlockedSiteOverlay(webview, hostname);
+            
+            // Immediately return to avoid any further processing
             return false;
-          } else {
-            console.debug('[Nova] New window allowed for:', extractDomain(currentUrl));
+          } else if (blockResult.showWarning) {
+            // Show warning for distracting sites in Focus Mode without Pomodoro
+            const hostname = extractDomain(currentUrl);
+            showFocusWarningNotification(hostname);
           }
         } catch (error) {
           console.error('[Nova] Error checking new window blocking:', error);
         }
-      } else {
-        console.debug('[Nova] Not in focus mode, allowing new window');
       }
     });
 
@@ -2947,15 +2969,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function enableDistractingDomainsBlocking() {
     try {
-      // Get the user-configured blocked domains from settings
-      const blockedDomains = await novaSettings.get('focus-blocked-domains', []);
+      // Default distracting domains for Focus Mode
+      const defaultBlockedDomains = [
+        // Social Media
+        'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+        'snapchat.com', 'linkedin.com', 'pinterest.com', 'reddit.com', 'tumblr.com',
+        'discord.com', 'telegram.org', 'whatsapp.com',
+        
+        // Entertainment & Video
+        'youtube.com', 'netflix.com', 'hulu.com', 'twitch.tv', 'vimeo.com',
+        'dailymotion.com', 'crunchyroll.com', 'funimation.com',
+        
+        // News & Media
+        'cnn.com', 'bbc.com', 'foxnews.com', 'nytimes.com', 'washingtonpost.com',
+        'buzzfeed.com', 'vice.com', 'theguardian.com',
+        
+        // Shopping & E-commerce
+        'amazon.com', 'ebay.com', 'etsy.com', 'walmart.com', 'target.com',
+        'alibaba.com', 'wish.com',
+        
+        // Gaming
+        'steam.com', 'epicgames.com', 'battle.net', 'origin.com', 'uplay.com',
+        'roblox.com', 'minecraft.net', 'twitch.tv',
+        
+        // Forums & Communities
+        '4chan.org', '9gag.com', 'imgur.com', 'deviantart.com'
+      ];
       
-      if (Array.isArray(blockedDomains) && blockedDomains.length > 0) {
-        console.log('[Nova] Distracting domains blocking enabled with', blockedDomains.length, 'domains');
-        console.log('[Nova] Blocked domains:', blockedDomains);
-      } else {
-        console.log('[Nova] No domains configured for blocking in Focus Mode');
-      }
+      // Get user-configured domains and merge with defaults
+      const userBlockedDomains = await novaSettings.get('focus-blocked-domains', []);
+      const allBlockedDomains = [...new Set([...defaultBlockedDomains, ...userBlockedDomains])];
+      
+      // Save the combined list
+      await novaSettings.set('focus-blocked-domains', allBlockedDomains);
+      
+      console.log('[Nova] Distracting domains blocking enabled with', allBlockedDomains.length, 'domains');
+      console.log('[Nova] Blocked domains include:', allBlockedDomains.slice(0, 10), '...');
+      
     } catch (error) {
       console.error('[Nova] Failed to enable distracting domains blocking:', error);
     }
@@ -2966,6 +3016,14 @@ document.addEventListener('DOMContentLoaded', () => {
   
   async function isWebsiteBlocked(urlOrHostname) {
     try {
+      // Only block if we're in Focus Mode AND Pomodoro timer is running
+      const isFocusMode = currentMode === 'focus';
+      const isPomodoroRunning = pomodoroIsRunning;
+      
+      if (!isFocusMode || !isPomodoroRunning) {
+        return false; // No blocking if not in focus mode or pomodoro not running
+      }
+      
       // Get current blocked sites from settings
       const blockedSites = await novaSettings.get('focus-blocked-domains', []);
       
@@ -3020,6 +3078,85 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('[Nova] Error checking blocked websites:', error);
       return false;
+    }
+  }
+  
+  // Enhanced website blocking that supports both full blocking and warning modes
+  async function isWebsiteBlockedEnhanced(urlOrHostname) {
+    try {
+      const isFocusMode = currentMode === 'focus';
+      const isPomodoroRunning = pomodoroIsRunning;
+      
+      console.debug('[Nova] Enhanced blocking check - Focus Mode:', isFocusMode, 'Pomodoro Running:', isPomodoroRunning, 'URL:', urlOrHostname);
+      
+      // Get current blocked sites from settings
+      const blockedSites = await novaSettings.get('focus-blocked-domains', []);
+      
+      // Ensure blockedSites is an array and contains only strings
+      if (!Array.isArray(blockedSites)) {
+        console.debug('[Nova] focus-blocked-domains is not an array:', typeof blockedSites);
+        return { shouldBlock: false, showWarning: false };
+      }
+      
+      // Filter out non-string items and empty strings
+      const validBlockedSites = blockedSites.filter(site => typeof site === 'string' && site.trim().length > 0);
+      
+      if (validBlockedSites.length === 0) {
+        console.debug('[Nova] No sites configured for blocking in Focus Mode');
+        return { shouldBlock: false, showWarning: false };
+      }
+      
+      // Extract domain using our regex-based utility
+      const extractedDomain = extractDomain(urlOrHostname);
+      if (!extractedDomain) {
+        console.debug('[Nova] Could not extract domain from:', urlOrHostname);
+        return { shouldBlock: false, showWarning: false };
+      }
+      
+      console.debug('[Nova] Checking if domain should be blocked/warned:', extractedDomain, 'against', validBlockedSites.length, 'blocked sites');
+      
+      // Check if extracted domain matches any blocked site
+      const isDistractingSite = validBlockedSites.some(blockedSite => {
+        const normalizedBlocked = extractDomain(blockedSite);
+        if (!normalizedBlocked) {
+          console.debug('[Nova] Could not normalize blocked site:', blockedSite);
+          return false;
+        }
+        
+        // Direct match or subdomain match
+        const isDirectMatch = extractedDomain === normalizedBlocked;
+        const isSubdomainMatch = extractedDomain.endsWith('.' + normalizedBlocked);
+        
+        if (isDirectMatch || isSubdomainMatch) {
+          console.debug('[Nova] MATCHED DISTRACTING SITE:', extractedDomain, 'matches', normalizedBlocked, isDirectMatch ? '(direct)' : '(subdomain)');
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!isDistractingSite) {
+        console.debug('[Nova] Domain is not in distracting sites list:', extractedDomain);
+        return { shouldBlock: false, showWarning: false };
+      }
+      
+      // Determine the action based on mode and pomodoro state
+      if (isFocusMode && isPomodoroRunning) {
+        // Full blocking: Focus Mode + Pomodoro running
+        console.debug('[Nova] FULL BLOCK: Focus Mode + Pomodoro active for distracting site:', extractedDomain);
+        return { shouldBlock: true, showWarning: false };
+      } else if (isFocusMode && !isPomodoroRunning) {
+        // Warning only: Focus Mode but no Pomodoro
+        console.debug('[Nova] WARNING MODE: Focus Mode only (no Pomodoro) for distracting site:', extractedDomain);
+        return { shouldBlock: false, showWarning: true };
+      } else {
+        // Normal mode or Privacy mode - no restrictions
+        console.debug('[Nova] NO RESTRICTIONS: Not in Focus Mode for site:', extractedDomain);
+        return { shouldBlock: false, showWarning: false };
+      }
+    } catch (error) {
+      console.error('[Nova] Error in enhanced website blocking check:', error);
+      return { shouldBlock: false, showWarning: false };
     }
   }
   
@@ -3106,32 +3243,82 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showBlockedSiteOverlay(webview, hostname) {
-    console.debug('[Nova] Creating blocked site overlay for:', hostname);
+    // Remove any existing overlay first
+    const existingOverlay = document.querySelector('.blocked-site-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+    
+    // Get timer text safely
+    let timerText = '--:--';
+    try {
+      if (pomodoroTimeDisplay && pomodoroTimeDisplay.textContent) {
+        timerText = pomodoroTimeDisplay.textContent;
+        console.log('[Nova] Got timer text from pomodoroTimeDisplay:', timerText);
+      } else {
+        console.log('[Nova] pomodoroTimeDisplay not available, using default timer text');
+      }
+    } catch (error) {
+      console.warn('[Nova] Error getting timer text:', error);
+    }
     
     // Create overlay element
     const overlay = document.createElement('div');
     overlay.className = 'blocked-site-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+      color: white;
+    `;
+    
     overlay.innerHTML = `
-      <div class="blocked-site-content">
-        <div class="blocked-site-icon">🚫</div>
-        <h2>Site Blocked</h2>
-        <p><strong>${hostname}</strong> is blocked in Focus Mode</p>
-        <p>Stay focused on your goals!</p>
-        <div class="blocked-site-actions">
-          <button class="btn btn-focus" onclick="this.closest('.blocked-site-overlay').remove()">Stay Focused</button>
-          <button class="btn btn-secondary" onclick="endFocusSession()">End Focus Session</button>
+      <div class="blocked-site-content" style="text-align: center; background: rgba(255, 255, 255, 0.1); padding: 40px; border-radius: 16px; max-width: 500px;">
+        <div style="font-size: 64px; margin-bottom: 16px;">🎯</div>
+        <h2 style="margin: 0 0 16px 0; font-size: 28px;">Focus Mode + Pomodoro Active</h2>
+        <p style="margin: 8px 0; font-size: 16px;"><strong>${hostname}</strong> is blocked during your focus session</p>
+        <p style="margin: 8px 0; font-size: 16px;">Stay productive! Your pomodoro timer is still running.</p>
+        <div style="background: rgba(255, 255, 255, 0.2); padding: 12px 20px; border-radius: 8px; margin: 20px 0; font-size: 18px;">
+          <span id="pomodoro-time-overlay">${timerText}</span> remaining
         </div>
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap;">
+          <button class="btn btn-focus" onclick="this.closest('.blocked-site-overlay').remove()" style="padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; background: #10b981; color: white;">Continue Focusing</button>
+          <button class="btn btn-warning" onclick="window.bypassFocusBlocking('${hostname}')" style="padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; background: #f59e0b; color: white;">Bypass Once</button>
+          <button class="btn btn-secondary" onclick="window.pausePomodoro()" style="padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; background: #6b7280; color: white;">Pause Timer</button>
+        </div>
+        <p style="margin: 16px 0 0 0; font-size: 14px; opacity: 0.8;">💡 Tip: Complete your pomodoro session for maximum productivity!</p>
       </div>
     `;
     
-    // Position overlay over the webview - use webviews container since webview is directly in it
-    const webviewsContainer = document.getElementById('webviews');
-    if (webviewsContainer) {
-      webviewsContainer.appendChild(overlay);
-      console.debug('[Nova] Blocked site overlay added to webviews container');
-    } else {
-      console.warn('[Nova] Could not find webviews container for overlay');
-    }
+    // Add to document body for guaranteed visibility
+    document.body.appendChild(overlay);
+    
+    // Force a reflow to ensure it's visible
+    overlay.offsetHeight;
+    
+    // Update the timer display every second
+    const updateOverlayTimer = setInterval(() => {
+      const overlayTimer = document.getElementById('pomodoro-time-overlay');
+      if (overlayTimer && pomodoroTimeDisplay && pomodoroTimeDisplay.textContent) {
+        overlayTimer.textContent = pomodoroTimeDisplay.textContent;
+      } else if (!overlayTimer) {
+        clearInterval(updateOverlayTimer);
+      }
+    }, 1000);
+    
+    // Auto-remove overlay after 30 seconds if user doesn't interact
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.remove();
+      }
+    }, 30000);
   }
 
   // AI Organize Button Event
@@ -3266,6 +3453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pomodoroIsRunning) return;
     
     pomodoroIsRunning = true;
+    onPomodoroStart(); // Clear bypassed domains when starting
     updatePomodoroDisplay();
     
     pomodoroTimer = setInterval(() => {
@@ -3434,7 +3622,7 @@ document.addEventListener('DOMContentLoaded', () => {
           newSettings.shortBreakDuration < 1 || newSettings.shortBreakDuration > 30 ||
           newSettings.longBreakDuration < 1 || newSettings.longBreakDuration > 60 ||
           newSettings.sessionsUntilLongBreak < 2 || newSettings.sessionsUntilLongBreak > 10) {
-        alert('Please enter valid durations within the specified ranges.');
+        showWarning('Please enter valid durations within the specified ranges.', 'Invalid Settings');
         return;
       }
       
@@ -3505,6 +3693,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }, 300);
     }, 3000);
+  }
+
+  // Focus Mode + Pomodoro Integration - Bypass System
+  let bypassedDomains = new Set(); // Domains bypassed for current session
+
+  // Global functions for overlay buttons
+  window.bypassFocusBlocking = function(hostname) {
+    bypassedDomains.add(hostname);
+    
+    // Remove all overlays for this domain
+    const overlays = document.querySelectorAll('.blocked-site-overlay');
+    overlays.forEach(overlay => {
+      if (overlay.innerHTML.includes(hostname)) {
+        overlay.remove();
+      }
+    });
+    
+    // Allow the current tab to navigate to the site
+    const activeWebview = getActiveWebview();
+    if (activeWebview && hostname) {
+      activeWebview.src = `https://${hostname}`;
+    }
+    
+    showInfo(`${hostname} bypassed for this session`, 'Focus Mode');
+    console.log('[Nova] Domain bypassed for session:', hostname);
+  };
+
+  window.pausePomodoro = function() {
+    pausePomodoroTimer();
+    
+    // Remove all overlays
+    const overlays = document.querySelectorAll('.blocked-site-overlay');
+    overlays.forEach(overlay => overlay.remove());
+    
+    showInfo('Pomodoro paused - sites unblocked', 'Focus Mode');
+  };
+
+  // Reset bypassed domains when pomodoro starts
+  function onPomodoroStart() {
+    bypassedDomains.clear();
+    console.log('[Nova] Pomodoro started - bypass list cleared');
   }
 
   // Privacy Modal Functions
@@ -4222,12 +4451,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = document.createElement('div');
     item.className = 'bookmark-item';
     item.title = bookmark.title;
-    item.onclick = () => {
+    item.onclick = async () => {
       const activeWebview = getActiveWebview();
       if (activeWebview) {
         if (bookmark.url.startsWith('nova://')) {
           handleNovaPage(bookmark.url, activeWebview);
         } else {
+          // Check for enhanced blocking in focus mode
+          if (currentMode === 'focus') {
+            console.debug('[Nova] Focus mode active, checking bookmark navigation to:', bookmark.url);
+            try {
+              const blockResult = await isWebsiteBlockedEnhanced(bookmark.url);
+              
+              if (blockResult.shouldBlock) {
+                const hostname = extractDomain(bookmark.url);
+                console.log('[Nova] BLOCKING BOOKMARK NAVIGATION to:', hostname, '(Focus Mode + Pomodoro Active)');
+                
+                // Don't navigate, show blocked overlay instead
+                showBlockedSiteOverlay(activeWebview, hostname);
+                return;
+              } else if (blockResult.showWarning) {
+                const hostname = extractDomain(bookmark.url);
+                console.debug('[Nova] Showing focus warning for bookmark navigation:', hostname);
+                showFocusWarningNotification(hostname);
+                // Continue with navigation
+              }
+            } catch (error) {
+              console.warn('[Nova] Error checking bookmark URL for enhanced blocking:', error);
+            }
+          }
+          
           activeWebview.src = bookmark.url;
         }
         urlInput.value = bookmark.url;
@@ -4317,13 +4570,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const dropdownItem = document.createElement('div');
     dropdownItem.className = 'bookmark-dropdown-item';
     dropdownItem.title = bookmark.title;
-    dropdownItem.onclick = (e) => {
+    dropdownItem.onclick = async (e) => {
       e.stopPropagation();
       const activeWebview = getActiveWebview();
       if (activeWebview) {
         if (bookmark.url.startsWith('nova://')) {
           handleNovaPage(bookmark.url, activeWebview);
         } else {
+          // Check for enhanced blocking in focus mode
+          if (currentMode === 'focus') {
+            console.debug('[Nova] Focus mode active, checking dropdown bookmark navigation to:', bookmark.url);
+            try {
+              const blockResult = await isWebsiteBlockedEnhanced(bookmark.url);
+              
+              if (blockResult.shouldBlock) {
+                const hostname = extractDomain(bookmark.url);
+                console.log('[Nova] BLOCKING DROPDOWN BOOKMARK NAVIGATION to:', hostname, '(Focus Mode + Pomodoro Active)');
+                
+                // Don't navigate, show blocked overlay instead
+                showBlockedSiteOverlay(activeWebview, hostname);
+                dropdown.style.display = 'none';
+                return;
+              } else if (blockResult.showWarning) {
+                const hostname = extractDomain(bookmark.url);
+                console.debug('[Nova] Showing focus warning for dropdown bookmark navigation:', hostname);
+                showFocusWarningNotification(hostname);
+                // Continue with navigation
+              }
+            } catch (error) {
+              console.warn('[Nova] Error checking dropdown bookmark URL for enhanced blocking:', error);
+            }
+          }
+          
           activeWebview.src = bookmark.url;
         }
         urlInput.value = bookmark.url;

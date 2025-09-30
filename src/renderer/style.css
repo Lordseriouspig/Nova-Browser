@@ -415,12 +415,12 @@ body[data-mode="privacy"] .tab.active {
 
 /* Blocked site notification */
 .blocked-site-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -436,7 +436,7 @@ body[data-mode="privacy"] .tab.active {
   border-radius: 16px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
+  max-width: 500px;
 }
 
 .blocked-site-icon {
@@ -448,7 +448,80 @@ body[data-mode="privacy"] .tab.active {
 .blocked-site-content h2 {
   margin: 0 0 16px 0;
   font-size: 28px;
-  font-weight: bold;
+  font-weight: 600;
+}
+
+.blocked-site-content p {
+  margin: 8px 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.blocked-site-timer {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-family-mono);
+}
+
+.blocked-site-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.blocked-site-actions .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family-base);
+}
+
+.blocked-site-actions .btn-focus {
+  background: rgba(255, 255, 255, 0.9);
+  color: #f59e0b;
+}
+
+.blocked-site-actions .btn-focus:hover {
+  background: white;
+  transform: translateY(-1px);
+}
+
+.blocked-site-actions .btn-warning {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+
+.blocked-site-actions .btn-warning:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: translateY(-1px);
+}
+
+.blocked-site-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.blocked-site-actions .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.blocked-site-note {
+  margin-top: 16px;
+  font-size: 14px;
+  opacity: 0.9;
+  font-style: italic;
 }
 
 .blocked-site-content p {
@@ -1743,6 +1816,26 @@ webview {
   z-index: 10000;
   backdrop-filter: blur(4px);
   animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Modal overlays */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal-overlay.show {
+  display: flex;
 }
 
 .modal-content {
