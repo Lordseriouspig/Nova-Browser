@@ -752,8 +752,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup webview events
   async function setupWebviewEvents(webview) {
-    // Wait for webview to be ready before configuring privacy
+    // Wait for webview to be ready before configuring
     webview.addEventListener('dom-ready', async () => {
+      // Set up content blocking for all modes
+      await setupWebviewContentBlocking(webview);
+      
+      // Additional privacy configuration for privacy mode
       if (currentMode === 'privacy') {
         await configurePrivacyWebview(webview);
       }
@@ -2464,6 +2468,10 @@ document.addEventListener('DOMContentLoaded', () => {
   async function initializeModeSystem() {
     try {
       console.log('[Nova] Initializing mode system...');
+      
+      // Set up content blocking for all modes (not just privacy)
+      await setupContentBlocking();
+      
       const savedMode = await novaSettings.get('browsing-mode', 'normal');
       console.log('[Nova] Saved mode from settings:', savedMode);
       await setMode(savedMode);
@@ -2687,6 +2695,38 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeModeSystem();
 
   // Privacy Mode Implementation Functions
+  // Set up content blocking for a specific webview
+  async function setupWebviewContentBlocking(webview) {
+    try {
+      if (!webview.getWebContents) return;
+      
+      const webContents = webview.getWebContents();
+      const session = webContents.session;
+      
+      // Apply content blocking using our domain list
+      session.webRequest.onBeforeRequest((details, callback) => {
+        // Only block specific ad/tracker resources, not main page navigation
+        const isMainFrameNavigation = details.resourceType === 'mainFrame';
+        
+        if (!isMainFrameNavigation) {
+          const shouldBlock = shouldBlockRequest(details.url, details.referrer);
+          
+          if (shouldBlock) {
+            console.log('[Nova] Blocked ad/tracker request:', details.url);
+            callback({ cancel: true });
+            return;
+          }
+        }
+        
+        callback({ cancel: false });
+      });
+      
+      console.log('[Nova] Content blocking configured for webview');
+    } catch (error) {
+      console.warn('[Nova] Failed to setup webview content blocking:', error);
+    }
+  }
+
   async function configurePrivacyWebview(webview) {
     try {
       // Configure webview for privacy
@@ -2840,25 +2880,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       console.log('[Nova] Configuring privacy session...');
       
-      // 1. Block requests using our content blocking system (only for ads/trackers)
-      session.webRequest.onBeforeRequest((details, callback) => {
-        // Only block specific ad/tracker resources, not main page navigation
-        const isMainFrameNavigation = details.resourceType === 'mainFrame';
-        
-        if (!isMainFrameNavigation) {
-          const shouldBlock = shouldBlockRequest(details.url, details.referrer);
-          
-          if (shouldBlock) {
-            console.log('[Nova] Blocked request:', details.url);
-            callback({ cancel: true });
-            return;
-          }
-        }
-        
-        callback({ cancel: false });
-      });
+      // Content blocking is handled separately in setupWebviewContentBlocking
+      // This function focuses on privacy-specific features
       
-      // 2. Block all cookies in privacy mode
+      // 1. Block all cookies in privacy mode
       session.webRequest.onHeadersReceived((details, callback) => {
         if (details.responseHeaders) {
           // Remove Set-Cookie headers to prevent cookie setting
@@ -2868,7 +2893,7 @@ document.addEventListener('DOMContentLoaded', () => {
         callback({ responseHeaders: details.responseHeaders });
       });
       
-      // 3. Set privacy-focused settings
+      // 2. Set privacy-focused settings
       await session.setPermissionRequestHandler((webContents, permission, callback) => {
         // Deny location, camera, microphone, notifications by default in privacy mode
         const privacyDenyList = ['geolocation', 'camera', 'microphone', 'notifications', 'persistent-storage'];
@@ -2877,7 +2902,7 @@ document.addEventListener('DOMContentLoaded', () => {
         callback(allowed);
       });
       
-      // 4. Clear existing cookies and storage
+      // 3. Clear existing cookies and storage
       await session.clearStorageData({
         storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'sessionstorage', 'appcache', 'serviceworkers', 'cachestorage']
       });
