@@ -1,20 +1,8 @@
-// Initialize Sentry for renderer process error tracking
-let Sentry = null;
-try {
-  Sentry = require("@sentry/electron/renderer");
-  Sentry.init({
-    dsn: "https://ebf0e69b9cea5c343f5b90005b9f214c@o4509766495043584.ingest.de.sentry.io/4509766498713680",
-    environment: process.env.NODE_ENV || 'development',
-  });
-  console.log('[Nova Renderer] Sentry initialized successfully');
-} catch (error) {
-  console.warn('[Nova Renderer] Sentry initialization failed:', error.message);
-  // Create a mock Sentry object to prevent errors
-  Sentry = {
-    captureException: (error) => console.error('[Nova Renderer] Error (Sentry disabled):', error),
-    captureMessage: (message, level) => console.log(`[Nova Renderer] Message (Sentry disabled):`, message)
-  };
-}
+// Initialize Sentry for renderer process error tracking (disabled due to require issues)
+let Sentry = {
+  captureException: (error) => console.error('[Nova Renderer] Error:', error),
+  captureMessage: (message, level) => console.log(`[Nova Renderer] Message:`, message)
+};
 
 // Override alert() function early to ensure it's captured before any other code runs
 let customAlertFunction = null;
@@ -226,6 +214,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const newTabBtn = document.getElementById('new-tab-btn');
   const newGroupBtn = document.getElementById('new-group-btn');
   const aiOrganizeBtn = document.getElementById('ai-organize-btn');
+  const pomodoroSelector = document.getElementById('pomodoro-selector');
+  const pomodoroBtn = document.getElementById('pomodoro-btn');
+  const pomodoroDropdown = document.getElementById('pomodoro-dropdown');
+  const pomodoroTimeDisplay = document.getElementById('pomodoro-time');
   const tabGroupsContainer = document.querySelector('.tab-groups-container');
   
   // Toolbar elements
@@ -238,6 +230,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const bookmarkBtn = document.getElementById('bookmark-btn');
   const downloadsBtn = document.getElementById('downloads-btn');
   const bookmarksBar = document.getElementById('bookmarks-bar');
+  
+  // Mode selector elements
+  const modeSelector = document.getElementById('mode-selector');
+  const modeBtn = document.getElementById('mode-btn');
+  const modeDropdown = document.getElementById('mode-dropdown');
+  const modeIcon = document.getElementById('mode-icon');
+  const modeText = document.getElementById('mode-text');
+  const modeOptions = document.querySelectorAll('.mode-option');
 
   let tabCount = 1;
 
@@ -397,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
     webview.setAttribute('preload', preloadPath);
 
     setupWebviewListener(webview);
-    setupWebviewEvents(webview);
+    await setupWebviewEvents(webview);
 
     tabButton.addEventListener('click', () => {
       activateTab(tabId);
@@ -503,6 +503,23 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         if (!url.startsWith('http')) url = 'https://' + url;
       }
+      
+      // Check for blocked sites in focus mode - show warning but allow navigation
+      if (currentMode === 'focus') {
+        console.debug('[Nova] Focus mode active, checking manual navigation to:', url);
+        try {
+          if (await isWebsiteBlocked(url)) {
+            const hostname = extractDomain(url);
+            console.debug('[Nova] Manual navigation would be blocked in strict mode:', hostname, 'allowing navigation but showing notification');
+            showFocusWarningNotification(hostname);
+          } else {
+            console.debug('[Nova] Manual navigation allowed for:', extractDomain(url));
+          }
+        } catch (error) {
+          console.warn('[Nova] Error checking URL for blocking:', error);
+        }
+      }
+      
       activeWebview.src = url;
     }
   });
@@ -730,7 +747,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Setup webview events
-  function setupWebviewEvents(webview) {
+  async function setupWebviewEvents(webview) {
+    // Wait for webview to be ready before configuring privacy
+    webview.addEventListener('dom-ready', async () => {
+      if (currentMode === 'privacy') {
+        await configurePrivacyWebview(webview);
+      }
+    });
+    
     webview.addEventListener('did-start-loading', () => {
     });
 
@@ -741,6 +765,63 @@ document.addEventListener('DOMContentLoaded', () => {
         if (webview.dataset.novaUrl) {
           urlInput.value = webview.dataset.novaUrl;
         }
+      }
+    });
+
+    // Block navigation for focus mode - optional visual feedback only
+    webview.addEventListener('will-navigate', async (event) => {
+      console.debug('[Nova] will-navigate event triggered:', event.url, 'current mode:', currentMode);
+      
+      if (currentMode === 'focus') {
+        const currentUrl = event.url;
+        console.debug('[Nova] Focus mode active, checking if URL should be blocked:', currentUrl);
+        
+        try {
+          if (await isWebsiteBlocked(currentUrl)) {
+            const hostname = extractDomain(currentUrl);
+            console.debug('[Nova] URL would be blocked in strict mode:', hostname, 'allowing navigation but showing notification');
+            
+            // Just show a notification but allow navigation
+            showFocusWarningNotification(hostname);
+          } else {
+            console.debug('[Nova] Navigation allowed for:', extractDomain(currentUrl));
+          }
+        } catch (error) {
+          console.error('[Nova] Error checking website blocking:', error);
+        }
+      } else {
+        console.debug('[Nova] Not in focus mode, allowing navigation');
+      }
+    });
+
+    // Also block new-window events for focus mode
+    webview.addEventListener('new-window', async (event) => {
+      console.debug('[Nova] new-window event triggered:', event.url, 'current mode:', currentMode);
+      
+      if (currentMode === 'focus') {
+        const currentUrl = event.url;
+        console.debug('[Nova] Focus mode active, checking if new window URL should be blocked:', currentUrl);
+        
+        try {
+          if (await isWebsiteBlocked(currentUrl)) {
+            const hostname = extractDomain(currentUrl);
+            console.debug('[Nova] New window blocked for:', hostname, 'preventing event and showing overlay');
+            
+            // Prevent the new window
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Show the blocked site overlay
+            showBlockedSiteOverlay(webview, hostname);
+            return false;
+          } else {
+            console.debug('[Nova] New window allowed for:', extractDomain(currentUrl));
+          }
+        } catch (error) {
+          console.error('[Nova] Error checking new window blocking:', error);
+        }
+      } else {
+        console.debug('[Nova] Not in focus mode, allowing new window');
       }
     });
 
@@ -1034,6 +1115,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // History tracking function
   async function addToHistory(url, webview) {
     try {
+      // Don't save history in privacy mode
+      if (currentMode === 'privacy') {
+        console.log('[Nova] History saving disabled in privacy mode');
+        return;
+      }
+      
       // Don't track certain URLs
       if (url === 'about:blank' || 
           url.startsWith('file://') || 
@@ -1902,6 +1989,9 @@ document.addEventListener('DOMContentLoaded', () => {
     saveTabGroups();
   }
 
+  // Make moveTabToGroup globally available
+  window.moveTabToGroup = moveTabToGroup;
+
   function updateTabGroupDisplay(groupId) {
     const group = tabGroups.get(groupId);
     if (!group) return;
@@ -2326,6 +2416,724 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Browsing Mode System
+  let currentMode = 'normal';
+  
+  // Mode icons and configurations
+  const modeConfigs = {
+    normal: {
+      name: 'Normal',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-app-window-icon lucide-app-window"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg>',
+      description: 'Standard browsing experience'
+    },
+    privacy: {
+      name: 'Privacy',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hat-glasses-icon lucide-hat-glasses"><path d="M14 18a2 2 0 0 0-4 0"/><path d="m19 11-2.11-6.657a2 2 0 0 0-2.752-1.148l-1.276.61A2 2 0 0 1 12 4H8.5a2 2 0 0 0-1.925 1.456L5 11"/><path d="M2 11h20"/><circle cx="17" cy="18" r="3"/><circle cx="7" cy="18" r="3"/></svg>',
+      description: 'Private browsing; no cookies, browsing data, or trackers'
+    },
+    focus: {
+      name: 'Focus',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scan-search-icon lucide-scan-search"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/></svg>',
+      description: 'Browse with minimal distractions'
+    }
+  };
+
+  // Initialize mode system
+  async function initializeModeSystem() {
+    try {
+      console.log('[Nova] Initializing mode system...');
+      const savedMode = await novaSettings.get('browsing-mode', 'normal');
+      console.log('[Nova] Saved mode from settings:', savedMode);
+      await setMode(savedMode);
+      updateModeUI();
+      console.log('[Nova] Mode system initialized successfully');
+    } catch (error) {
+      console.error('[Nova] Failed to initialize mode system:', error);
+      console.log('[Nova] Falling back to normal mode');
+      await setMode('normal');
+    }
+  }
+
+  // Set browsing mode
+  async function setMode(mode) {
+    if (!modeConfigs[mode]) {
+      console.warn('[Nova] Invalid mode:', mode);
+      return;
+    }
+
+    const previousMode = currentMode;
+    currentMode = mode;
+    
+    console.log(`[Nova] Setting mode from ${previousMode} to ${mode}`);
+    
+    // Update body data attribute
+    document.body.setAttribute('data-mode', mode);
+    console.log('[Nova] Body data-mode attribute set to:', document.body.getAttribute('data-mode'));
+    
+    // Apply mode-specific settings
+    switch (mode) {
+      case 'privacy':
+        await applyPrivacyMode();
+        break;
+      case 'focus':
+        await applyFocusMode();
+        break;
+      case 'normal':
+      default:
+        await applyNormalMode();
+        break;
+    }
+    
+    // Save mode preference
+    try {
+      await novaSettings.set('browsing-mode', mode);
+    } catch (error) {
+      console.error('[Nova] Failed to save mode preference:', error);
+    }
+    
+    // Update UI
+    updateModeUI();
+    
+    // Show notification
+    if (previousMode !== mode) {
+      showInfo(`Switched to ${modeConfigs[mode].name} Mode`, 'Browsing Mode');
+    }
+    
+    console.log(`[Nova] Mode changed to: ${mode}`);
+  }
+
+  // Apply Normal Mode settings
+  async function applyNormalMode() {
+    console.log('[Nova] Normal mode activated - restoring standard browsing');
+    
+    try {
+      // Clear any mode-specific CSS classes
+      document.body.classList.remove('focus-active');
+      
+      // Reset any mode-specific overrides
+      document.body.style.filter = '';
+      
+      // Remove focus timer if it exists
+      const timerElement = document.getElementById('focus-timer');
+      if (timerElement) {
+        timerElement.remove();
+      }
+      
+      // Clear any focus timer intervals
+      if (window.focusTimer) {
+        clearInterval(window.focusTimer);
+        window.focusTimer = null;
+      }
+      
+      // Show bookmarks bar if it was visible
+      const showBookmarks = await novaSettings.get('show-bookmarks-bar', false);
+      if (showBookmarks) {
+        bookmarksBar.classList.add('show');
+      }
+      
+      // Reset content blocking to normal (disable privacy blocking)
+      await novaSettings.set('content-blocking-enabled', false);
+      
+      console.log('[Nova] Normal mode applied successfully');
+    } catch (error) {
+      console.error('[Nova] Failed to apply normal mode:', error);
+    }
+  }
+
+  // Apply Privacy Mode settings
+  async function applyPrivacyMode() {
+    console.log('[Nova] Privacy mode activated - implementing privacy protections');
+    
+    try {
+      // 1. Configure webview security settings for all active webviews
+      const webviews = document.querySelectorAll('webview');
+      for (const webview of webviews) {
+        if (webview.getWebContents) {
+          await configurePrivacyWebview(webview);
+        }
+      }
+      
+      // 2. Set up content blocking
+      await setupContentBlocking();
+      
+      // 3. Clear cookies and browsing data (but preserve history)
+      console.log('[Nova] Clearing cookies and browsing data for privacy mode...');
+      await clearBrowsingData();
+      
+      // 4. Disable history saving for new visits
+      await novaSettings.set('save-history-in-privacy', false);
+      console.log('[Nova] History recording disabled for privacy session');
+      
+      // 5. Enable tracking protection
+      await enableTrackingProtection();
+      
+      showSuccess('Privacy protections activated! New history disabled, cookies blocked.', 'Privacy Mode');
+      
+    } catch (error) {
+      console.error('[Nova] Failed to apply privacy settings:', error);
+      showError('Failed to enable some privacy features', 'Privacy Mode');
+    }
+  }
+
+  // Apply Focus Mode settings
+  async function applyFocusMode() {
+    console.log('[Nova] Focus mode activated - minimizing distractions');
+    
+    try {
+      // 1. Hide bookmarks bar in focus mode
+      bookmarksBar.classList.remove('show');
+      
+      // 2. Enable focus timer if configured
+      const enableTimer = await novaSettings.get('focus-timer-enabled', false);
+      if (enableTimer) {
+        await startFocusTimer();
+      }
+      
+      // 3. Hide non-essential UI elements
+      applyFocusUI();
+      
+      // 4. Block social media and distracting domains
+      await enableDistractingDomainsBlocking();
+      
+      showInfo('Focus mode enabled - distractions minimized', 'Focus Mode');
+      
+    } catch (error) {
+      console.error('[Nova] Failed to apply focus settings:', error);
+      showError('Failed to enable some focus features', 'Focus Mode');
+    }
+  }
+
+  // Update mode UI elements
+  function updateModeUI() {
+    const config = modeConfigs[currentMode];
+    
+    // Update button text and icon
+    modeText.textContent = config.name;
+    modeIcon.innerHTML = config.icon;
+    
+    // Update active state in dropdown
+    modeOptions.forEach(option => {
+      const optionMode = option.getAttribute('data-mode');
+      if (optionMode === currentMode) {
+        option.classList.add('active');
+      } else {
+        option.classList.remove('active');
+      }
+    });
+  }
+
+  // Mode selector event listeners
+  modeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = modeDropdown.classList.contains('show');
+    
+    if (isOpen) {
+      closeModeDropdown();
+    } else {
+      openModeDropdown();
+    }
+  });
+
+  function openModeDropdown() {
+    modeDropdown.classList.add('show');
+    modeBtn.classList.add('open');
+  }
+
+  function closeModeDropdown() {
+    modeDropdown.classList.remove('show');
+    modeBtn.classList.remove('open');
+  }
+
+  // Handle mode selection
+  modeOptions.forEach(option => {
+    option.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const selectedMode = option.getAttribute('data-mode');
+      await setMode(selectedMode);
+      closeModeDropdown();
+    });
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!modeSelector.contains(e.target)) {
+      closeModeDropdown();
+    }
+  });
+
+  // Initialize mode system on load
+  initializeModeSystem();
+
+  // Privacy Mode Implementation Functions
+  async function configurePrivacyWebview(webview) {
+    try {
+      // Configure webview for privacy
+      if (webview.setUserAgent) {
+        // Set privacy-focused user agent (removes identifying information)
+        webview.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Nova/1.0');
+      }
+      
+      // Apply comprehensive privacy session configuration
+      await configurePrivacySession(webview);
+      
+      console.log('[Nova] Privacy webview configured successfully');
+    } catch (error) {
+      console.error('[Nova] Failed to configure privacy webview:', error);
+    }
+  }
+
+  // Content blocking system with comprehensive ad/tracker blocking
+  let blockedDomains = [];
+  
+  async function setupContentBlocking() {
+    try {
+      console.log('[Nova] Setting up content blocking...');
+      
+      // Use comprehensive blocked domains list since require() isn't available in renderer
+      const adBlockingDomains = [
+        // Google Ads & Analytics
+        'doubleclick.net', 'googleadservices.com', 'googlesyndication.com',
+        'google-analytics.com', 'googletagmanager.com', 'googletagservices.com',
+        'googletag.com', 'adsystem.google.com',
+        
+        // Facebook/Meta Tracking
+        'facebook.com/tr', 'connect.facebook.net', 'facebook.net',
+        'fbcdn.net/signals', 'facebook.com/plugins',
+        
+        // Amazon Ads
+        'amazon-adsystem.com', 'adsystem.amazon.com', 'media-amazon.com',
+        
+        // Other Major Ad Networks
+        'ads.yahoo.com', 'advertising.com', 'adsymptotic.com',
+        'bing.com/adpixel', 'twitter.com/i/adsct', 'linkedin.com/px',
+        'outbrain.com', 'taboola.com', 'criteo.com', 'rubiconproject.com',
+        
+        // Analytics & Tracking
+        'scorecardresearch.com', 'quantserve.com', 'addthis.com', 'sharethis.com',
+        'hotjar.com', 'fullstory.com', 'mouseflow.com', 'crazyegg.com',
+        'mixpanel.com', 'segment.com', 'amplitude.com',
+        
+        // Additional Ad Networks
+        'pubmatic.com', 'openx.com', 'adsystem.com', 'admixer.net',
+        'adsense.com', 'adnxs.com', 'adskeeper.com', 'mgid.com',
+        'revcontent.com', 'content.ad', 'smartadserver.com'
+      ];
+      
+      blockedDomains = adBlockingDomains;
+      await novaSettings.set('blocked-domains', blockedDomains);
+      await novaSettings.set('content-blocking-enabled', true);
+      
+      console.log('[Nova] Content blocking enabled for', blockedDomains.length, 'domains');
+      
+    } catch (error) {
+      console.error('[Nova] Failed to setup content blocking:', error);
+      
+      // Ultimate fallback - basic domain list
+      blockedDomains = [
+        'doubleclick.net', 'googleadservices.com', 'google-analytics.com',
+        'facebook.com/tr', 'amazon-adsystem.com', 'ads.yahoo.com'
+      ];
+      
+      await novaSettings.set('blocked-domains', blockedDomains);
+      console.log('[Nova] Fallback content blocking enabled');
+    }
+  }
+  
+  // Check if a URL should be blocked
+  function shouldBlockRequest(url, documentUrl = '') {
+    if (!url) return false;
+    
+    try {
+      const hostname = new URL(url).hostname;
+      const currentBlockedDomains = blockedDomains.length > 0 ? blockedDomains : novaSettings.get('blocked-domains', []);
+      
+      // Check if hostname matches any blocked domain
+      const isBlocked = currentBlockedDomains.some(domain => {
+        // Remove protocol prefixes if present
+        const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
+        const cleanHostname = hostname.replace(/^www\./, '');
+        
+        return cleanHostname === cleanDomain || 
+               cleanHostname.endsWith('.' + cleanDomain) ||
+               cleanDomain.includes(cleanHostname);
+      });
+      
+      if (isBlocked) {
+        console.log('[Nova] Blocked request to:', hostname);
+      }
+      
+      return isBlocked;
+      
+    } catch (error) {
+      console.warn('[Nova] Error checking URL for blocking:', error);
+      return false;
+    }
+  }
+
+  async function clearBrowsingData() {
+    try {
+      console.log('[Nova] Clearing browsing data for privacy mode...');
+      
+      // Clear session data from webviews
+      const webviews = document.querySelectorAll('webview');
+      for (const webview of webviews) {
+        if (webview.getWebContents) {
+          try {
+            const webContents = webview.getWebContents();
+            const session = webContents.session;
+            
+            // Clear cookies, cache, and storage
+            await session.clearStorageData({
+              storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'sessionstorage', 'appcache', 'serviceworkers', 'cachestorage']
+            });
+            
+            // Clear cache
+            await session.clearCache();
+            
+            console.log('[Nova] Cleared webview session data');
+          } catch (webviewError) {
+            console.warn('[Nova] Failed to clear webview data:', webviewError);
+          }
+        }
+      }
+      
+      // Also try the main API if available
+      if (window.novaAPI && window.novaAPI.invoke) {
+        await window.novaAPI.invoke('clear-browsing-data');
+      }
+      
+      console.log('[Nova] Browsing data cleared successfully');
+    } catch (error) {
+      console.error('[Nova] Failed to clear browsing data:', error);
+    }
+  }
+  
+  // Enhanced privacy webview configuration
+  async function configurePrivacySession(webview) {
+    try {
+      if (!webview.getWebContents) return;
+      
+      const webContents = webview.getWebContents();
+      const session = webContents.session;
+      
+      console.log('[Nova] Configuring privacy session...');
+      
+      // 1. Block requests using our content blocking system (only for ads/trackers)
+      session.webRequest.onBeforeRequest((details, callback) => {
+        // Only block specific ad/tracker resources, not main page navigation
+        const isMainFrameNavigation = details.resourceType === 'mainFrame';
+        
+        if (!isMainFrameNavigation) {
+          const shouldBlock = shouldBlockRequest(details.url, details.referrer);
+          
+          if (shouldBlock) {
+            console.log('[Nova] Blocked request:', details.url);
+            callback({ cancel: true });
+            return;
+          }
+        }
+        
+        callback({ cancel: false });
+      });
+      
+      // 2. Block all cookies in privacy mode
+      session.webRequest.onHeadersReceived((details, callback) => {
+        if (details.responseHeaders) {
+          // Remove Set-Cookie headers to prevent cookie setting
+          delete details.responseHeaders['Set-Cookie'];
+          delete details.responseHeaders['set-cookie'];
+        }
+        callback({ responseHeaders: details.responseHeaders });
+      });
+      
+      // 3. Set privacy-focused settings
+      await session.setPermissionRequestHandler((webContents, permission, callback) => {
+        // Deny location, camera, microphone, notifications by default in privacy mode
+        const privacyDenyList = ['geolocation', 'camera', 'microphone', 'notifications', 'persistent-storage'];
+        const allowed = !privacyDenyList.includes(permission);
+        console.log(`[Nova] Permission ${permission}: ${allowed ? 'ALLOWED' : 'DENIED'}`);
+        callback(allowed);
+      });
+      
+      // 4. Clear existing cookies and storage
+      await session.clearStorageData({
+        storages: ['cookies', 'filesystem', 'indexdb', 'localstorage', 'sessionstorage', 'appcache', 'serviceworkers', 'cachestorage']
+      });
+      
+      // 5. Set cookie policy to block all
+      await session.cookies.set({
+        url: 'https://example.com',
+        name: '__privacy_mode_active',
+        value: 'true'
+      });
+      
+      // 6. Block tracking cookies in real-time
+      session.cookies.on('changed', async (event, cookie, cause, removed) => {
+        if (!removed && currentMode === 'privacy') {
+          // In privacy mode, remove all cookies except our own marker
+          if (cookie.name !== '__privacy_mode_active') {
+            try {
+              await session.cookies.remove(`http${cookie.secure ? 's' : ''}://${cookie.domain}`, cookie.name);
+              console.log('[Nova] Removed cookie:', cookie.name, 'from', cookie.domain);
+            } catch (error) {
+              console.warn('[Nova] Failed to remove cookie:', error);
+            }
+          }
+        }
+      });
+      
+      console.log('[Nova] Privacy session configured successfully');
+    } catch (error) {
+      console.error('[Nova] Failed to configure privacy session:', error);
+    }
+  }
+  
+  function isTrackingDomain(domain) {
+    const trackingDomains = [
+      'doubleclick.net', 'googleadservices.com', 'google-analytics.com',
+      'facebook.com', 'connect.facebook.net', 'scorecardresearch.com',
+      'quantserve.com', 'outbrain.com', 'taboola.com'
+    ];
+    
+    return trackingDomains.some(tracker => 
+      domain === tracker || domain.endsWith('.' + tracker)
+    );
+  }
+
+  async function enableTrackingProtection() {
+    try {
+      // Enable Do Not Track
+      await novaSettings.set('do-not-track', true);
+      
+      // Block known tracking domains
+      const trackingDomains = [
+        'facebook.com/tr', 'connect.facebook.net', 'analytics.google.com',
+        'stats.wp.com', 'b.scorecardresearch.com', 'sb.scorecardresearch.com',
+        'google-analytics.com', 'googletagmanager.com', 'hotjar.com',
+        'fullstory.com', 'mouseflow.com', 'crazyegg.com', 'mixpanel.com'
+      ];
+      
+      await novaSettings.set('tracking-domains', trackingDomains);
+      console.log('[Nova] Tracking protection enabled');
+    } catch (error) {
+      console.error('[Nova] Failed to enable tracking protection:', error);
+    }
+  }
+
+  // Focus Mode Implementation Functions
+  
+  // Utility function to extract domain from URL using regex
+  function extractDomain(url) {
+    if (!url || typeof url !== 'string') return '';
+    
+    // Use regex to extract domain: ^(?:https?:\/\/)?(?:www\.)?([^\/:]+)
+    const domainRegex = /^(?:https?:\/\/)?(?:www\.)?([^\/:]+)/;
+    const match = url.match(domainRegex);
+    
+    if (match && match[1]) {
+      const domain = match[1].toLowerCase();
+      return domain; // Return domain in lowercase for consistent comparison
+    }
+    
+    // Fallback to URL constructor if regex fails
+    try {
+      const fallbackDomain = new URL(url.startsWith('http') ? url : 'https://' + url).hostname.replace(/^www\./, '').toLowerCase();
+      return fallbackDomain;
+    } catch (error) {
+      console.warn('[Nova] Failed to extract domain from:', url, error);
+      return '';
+    }
+  }
+
+  async function enableDistractingDomainsBlocking() {
+    try {
+      // Get the user-configured blocked domains from settings
+      const blockedDomains = await novaSettings.get('focus-blocked-domains', []);
+      
+      if (Array.isArray(blockedDomains) && blockedDomains.length > 0) {
+        console.log('[Nova] Distracting domains blocking enabled with', blockedDomains.length, 'domains');
+        console.log('[Nova] Blocked domains:', blockedDomains);
+      } else {
+        console.log('[Nova] No domains configured for blocking in Focus Mode');
+      }
+    } catch (error) {
+      console.error('[Nova] Failed to enable distracting domains blocking:', error);
+    }
+  }
+
+  let focusTimer = null;
+  let focusStartTime = null;
+  
+  async function isWebsiteBlocked(urlOrHostname) {
+    try {
+      // Get current blocked sites from settings
+      const blockedSites = await novaSettings.get('focus-blocked-domains', []);
+      
+      // Ensure blockedSites is an array and contains only strings
+      if (!Array.isArray(blockedSites)) {
+        console.debug('[Nova] focus-blocked-domains is not an array:', typeof blockedSites);
+        return false;
+      }
+      
+      // Filter out non-string items and empty strings
+      const validBlockedSites = blockedSites.filter(site => typeof site === 'string' && site.trim().length > 0);
+      
+      if (validBlockedSites.length === 0) {
+        console.debug('[Nova] No sites configured for blocking in Focus Mode');
+        return false;
+      }
+      
+      // Extract domain using our regex-based utility
+      const extractedDomain = extractDomain(urlOrHostname);
+      if (!extractedDomain) {
+        console.debug('[Nova] Could not extract domain from:', urlOrHostname);
+        return false;
+      }
+      
+      console.debug('[Nova] Checking if domain is blocked:', extractedDomain, 'against', validBlockedSites.length, 'blocked sites');
+      
+      // Check if extracted domain matches any blocked site
+      const isBlocked = validBlockedSites.some(blockedSite => {
+        const normalizedBlocked = extractDomain(blockedSite);
+        if (!normalizedBlocked) {
+          console.debug('[Nova] Could not normalize blocked site:', blockedSite);
+          return false;
+        }
+        
+        // Direct match or subdomain match
+        const isDirectMatch = extractedDomain === normalizedBlocked;
+        const isSubdomainMatch = extractedDomain.endsWith('.' + normalizedBlocked);
+        
+        if (isDirectMatch || isSubdomainMatch) {
+          console.debug('[Nova] BLOCKED:', extractedDomain, 'matches', normalizedBlocked, isDirectMatch ? '(direct)' : '(subdomain)');
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!isBlocked) {
+        console.debug('[Nova] Domain allowed:', extractedDomain);
+      }
+      
+      return isBlocked;
+    } catch (error) {
+      console.error('[Nova] Error checking blocked websites:', error);
+      return false;
+    }
+  }
+  
+  async function startFocusTimer() {
+    try {
+      const timerDuration = await novaSettings.get('focus-timer-duration', 25); // 25 minutes default (Pomodoro)
+      focusStartTime = Date.now();
+      
+      // Create focus timer UI
+      createFocusTimerUI(timerDuration);
+      
+      // Set timer to end focus session
+      focusTimer = setTimeout(() => {
+        endFocusSession();
+      }, timerDuration * 60 * 1000);
+      
+      console.log(`[Nova] Focus timer started for ${timerDuration} minutes`);
+    } catch (error) {
+      console.error('[Nova] Failed to start focus timer:', error);
+    }
+  }
+
+  function createFocusTimerUI(duration) {
+    // Create a small timer indicator in the UI
+    const timerElement = document.createElement('div');
+    timerElement.id = 'focus-timer';
+    timerElement.className = 'focus-timer';
+    timerElement.innerHTML = `
+      <div class="focus-timer-content">
+        <span class="focus-timer-icon">🎯</span>
+        <span class="focus-timer-text">Focus: ${duration}:00</span>
+      </div>
+    `;
+    
+    // Add to toolbar
+    const toolbar = document.getElementById('toolbar');
+    toolbar.appendChild(timerElement);
+    
+    // Update timer every minute
+    const updateInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - focusStartTime) / 1000 / 60);
+      const remaining = duration - elapsed;
+      
+      if (remaining <= 0) {
+        clearInterval(updateInterval);
+        return;
+      }
+      
+      const timerText = timerElement.querySelector('.focus-timer-text');
+      if (timerText) {
+        timerText.textContent = `Focus: ${remaining}:00`;
+      }
+    }, 60000);
+  }
+
+  function endFocusSession() {
+    // Remove timer UI
+    const timerElement = document.getElementById('focus-timer');
+    if (timerElement) {
+      timerElement.remove();
+    }
+    
+    // Show completion notification
+    showSuccess('Focus session completed! Great work! 🎉', 'Focus Mode');
+    
+    // Optionally switch back to normal mode
+    setTimeout(() => {
+      setMode('normal');
+    }, 3000);
+  }
+
+  // Make endFocusSession globally available for HTML onclick
+  window.endFocusSession = endFocusSession;
+
+  function applyFocusUI() {
+    // Add focus-specific CSS class for enhanced styling
+    document.body.classList.add('focus-active');
+    
+    // Hide download notifications in focus mode
+    const downloadNotifications = document.querySelectorAll('.download-notification');
+    downloadNotifications.forEach(notification => {
+      notification.style.display = 'none';
+    });
+  }
+
+  function showBlockedSiteOverlay(webview, hostname) {
+    console.debug('[Nova] Creating blocked site overlay for:', hostname);
+    
+    // Create overlay element
+    const overlay = document.createElement('div');
+    overlay.className = 'blocked-site-overlay';
+    overlay.innerHTML = `
+      <div class="blocked-site-content">
+        <div class="blocked-site-icon">🚫</div>
+        <h2>Site Blocked</h2>
+        <p><strong>${hostname}</strong> is blocked in Focus Mode</p>
+        <p>Stay focused on your goals!</p>
+        <div class="blocked-site-actions">
+          <button class="btn btn-focus" onclick="this.closest('.blocked-site-overlay').remove()">Stay Focused</button>
+          <button class="btn btn-secondary" onclick="endFocusSession()">End Focus Session</button>
+        </div>
+      </div>
+    `;
+    
+    // Position overlay over the webview - use webviews container since webview is directly in it
+    const webviewsContainer = document.getElementById('webviews');
+    if (webviewsContainer) {
+      webviewsContainer.appendChild(overlay);
+      console.debug('[Nova] Blocked site overlay added to webviews container');
+    } else {
+      console.warn('[Nova] Could not find webviews container for overlay');
+    }
+  }
+
   // AI Organize Button Event
   aiOrganizeBtn.addEventListener('click', async () => {
     try {
@@ -2344,6 +3152,360 @@ document.addEventListener('DOMContentLoaded', () => {
       showAIPrivacyModal();
     }
   });
+
+  // Pomodoro Timer State
+  let pomodoroTimer = null;
+  let pomodoroTimeLeft = 25 * 60; // 25 minutes in seconds
+  let pomodoroIsRunning = false;
+  let pomodoroIsBreak = false;
+  let pomodoroSessions = 0;
+  let pomodoroSettings = {
+    workDuration: 25,
+    shortBreakDuration: 5,
+    longBreakDuration: 15,
+    sessionsUntilLongBreak: 4
+  };
+
+  // Load pomodoro settings
+  async function loadPomodoroSettings() {
+    try {
+      const settings = await novaSettings.get('pomodoro-settings', pomodoroSettings);
+      pomodoroSettings = { ...pomodoroSettings, ...settings };
+      pomodoroTimeLeft = pomodoroSettings.workDuration * 60;
+      updatePomodoroDisplay();
+    } catch (error) {
+      console.warn('[Nova] Failed to load pomodoro settings:', error);
+    }
+  }
+
+  // Save pomodoro settings
+  async function savePomodoroSettings() {
+    try {
+      await novaSettings.set('pomodoro-settings', pomodoroSettings);
+    } catch (error) {
+      console.warn('[Nova] Failed to save pomodoro settings:', error);
+    }
+  }
+
+  // Pomodoro dropdown toggle
+  pomodoroBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    
+    const isOpen = pomodoroDropdown.classList.contains('show');
+    
+    if (isOpen) {
+      closePomodoroDropdown();
+    } else {
+      openPomodoroDropdown();
+    }
+  });
+
+  function openPomodoroDropdown() {
+    // Calculate position for fixed dropdown
+    const btnRect = pomodoroBtn.getBoundingClientRect();
+    
+    // Position dropdown below button, aligned to the right edge
+    const top = btnRect.bottom + 4; // 4px margin
+    const right = window.innerWidth - btnRect.right;
+    
+    // Move dropdown to body to escape all container constraints
+    if (pomodoroDropdown.parentElement !== document.body) {
+      document.body.appendChild(pomodoroDropdown);
+    }
+    
+    // Apply positioning
+    pomodoroDropdown.style.top = `${top}px`;
+    pomodoroDropdown.style.right = `${right}px`;
+    
+    pomodoroDropdown.classList.add('show');
+    pomodoroSelector.classList.add('open');
+  }
+
+  function closePomodoroDropdown() {
+    pomodoroDropdown.classList.remove('show');
+    pomodoroSelector.classList.remove('open');
+    
+    // Move dropdown back to its original container
+    if (pomodoroDropdown.parentElement === document.body) {
+      pomodoroSelector.appendChild(pomodoroDropdown);
+    }
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!pomodoroSelector.contains(e.target)) {
+      closePomodoroDropdown();
+    }
+  });
+
+  // Handle pomodoro dropdown options
+  pomodoroDropdown.addEventListener('click', (e) => {
+    const option = e.target.closest('.pomodoro-option');
+    if (!option) return;
+
+    const action = option.dataset.action;
+    pomodoroSelector.classList.remove('open');
+
+    switch (action) {
+      case 'start':
+        startPomodoroTimer();
+        break;
+      case 'pause':
+        pausePomodoroTimer();
+        break;
+      case 'reset':
+        resetPomodoroTimer();
+        break;
+      case 'settings':
+        showPomodoroSettingsModal();
+        break;
+    }
+  });
+
+  function startPomodoroTimer() {
+    if (pomodoroIsRunning) return;
+    
+    pomodoroIsRunning = true;
+    updatePomodoroDisplay();
+    
+    pomodoroTimer = setInterval(() => {
+      pomodoroTimeLeft--;
+      updatePomodoroDisplay();
+      
+      if (pomodoroTimeLeft <= 0) {
+        // Timer finished
+        clearInterval(pomodoroTimer);
+        pomodoroIsRunning = false;
+        
+        if (pomodoroIsBreak) {
+          // Break finished, start new work session
+          pomodoroIsBreak = false;
+          pomodoroTimeLeft = pomodoroSettings.workDuration * 60;
+          showPomodoroNotification('Break over!', 'Time to get back to work.');
+        } else {
+          // Work session finished
+          pomodoroSessions++;
+          
+          if (pomodoroSessions % pomodoroSettings.sessionsUntilLongBreak === 0) {
+            // Long break after specified sessions
+            pomodoroIsBreak = true;
+            pomodoroTimeLeft = pomodoroSettings.longBreakDuration * 60;
+            showPomodoroNotification('Time for a long break!', `You've completed ${pomodoroSessions} sessions. Take a ${pomodoroSettings.longBreakDuration}-minute break.`);
+          } else {
+            // Short break
+            pomodoroIsBreak = true;
+            pomodoroTimeLeft = pomodoroSettings.shortBreakDuration * 60;
+            showPomodoroNotification('Time for a break!', `Take a ${pomodoroSettings.shortBreakDuration}-minute break.`);
+          }
+        }
+        
+        updatePomodoroDisplay();
+      }
+    }, 1000);
+  }
+
+  function pausePomodoroTimer() {
+    if (!pomodoroIsRunning) return;
+    
+    pomodoroIsRunning = false;
+    if (pomodoroTimer) {
+      clearInterval(pomodoroTimer);
+      pomodoroTimer = null;
+    }
+    updatePomodoroDisplay();
+  }
+
+  function resetPomodoroTimer() {
+    pomodoroIsRunning = false;
+    if (pomodoroTimer) {
+      clearInterval(pomodoroTimer);
+      pomodoroTimer = null;
+    }
+    pomodoroIsBreak = false;
+    pomodoroTimeLeft = pomodoroSettings.workDuration * 60;
+    updatePomodoroDisplay();
+  }
+
+  function updatePomodoroDisplay() {
+    const minutes = Math.floor(pomodoroTimeLeft / 60);
+    const seconds = pomodoroTimeLeft % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Update time display
+    pomodoroTimeDisplay.textContent = timeString;
+    
+    // Update button appearance
+    pomodoroBtn.classList.remove('running', 'break');
+    
+    if (pomodoroIsRunning) {
+      pomodoroBtn.classList.add(pomodoroIsBreak ? 'break' : 'running');
+      pomodoroBtn.title = `Pomodoro ${pomodoroIsBreak ? 'Break' : 'Work'} - ${timeString} (Running)`;
+    } else {
+      pomodoroBtn.title = `Pomodoro Timer - ${timeString} (${pomodoroIsBreak ? 'Break' : 'Work'}) - Click for options`;
+    }
+    
+    // Update dropdown options visibility
+    const startOption = pomodoroDropdown.querySelector('[data-action="start"]');
+    const pauseOption = pomodoroDropdown.querySelector('[data-action="pause"]');
+    
+    if (pomodoroIsRunning) {
+      startOption.style.display = 'none';
+      pauseOption.style.display = 'flex';
+    } else {
+      startOption.style.display = 'flex';
+      pauseOption.style.display = 'none';
+    }
+  }
+
+  function showPomodoroNotification(title, message) {
+    // Create a custom notification overlay
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 10000;
+      max-width: 300px;
+      animation: slideIn 0.3s ease;
+    `;
+    
+    notification.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 5px;">${title}</div>
+      <div style="font-size: 14px;">${message}</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 5000);
+    
+    // Try to show system notification if available
+    if (window.novaAPI && window.novaAPI.notification) {
+      window.novaAPI.notification.show({
+        title: title,
+        body: message,
+        icon: './assets/icon/icon.png'
+      });
+    }
+  }
+
+  // Initialize pomodoro button state
+  loadPomodoroSettings();
+
+  // Pomodoro Settings Modal Functions
+  function showPomodoroSettingsModal() {
+    const modal = document.getElementById('pomodoro-settings-modal');
+    
+    // Populate current settings
+    document.getElementById('work-duration').value = pomodoroSettings.workDuration;
+    document.getElementById('short-break-duration').value = pomodoroSettings.shortBreakDuration;
+    document.getElementById('long-break-duration').value = pomodoroSettings.longBreakDuration;
+    document.getElementById('sessions-until-long-break').value = pomodoroSettings.sessionsUntilLongBreak;
+    
+    modal.style.display = 'flex';
+    
+    // Add event listeners
+    const saveBtn = document.getElementById('pomodoro-settings-save');
+    const cancelBtn = document.getElementById('pomodoro-settings-cancel');
+    
+    const saveHandler = async () => {
+      // Get new values
+      const newSettings = {
+        workDuration: parseInt(document.getElementById('work-duration').value),
+        shortBreakDuration: parseInt(document.getElementById('short-break-duration').value),
+        longBreakDuration: parseInt(document.getElementById('long-break-duration').value),
+        sessionsUntilLongBreak: parseInt(document.getElementById('sessions-until-long-break').value)
+      };
+      
+      // Validate values
+      if (newSettings.workDuration < 1 || newSettings.workDuration > 60 ||
+          newSettings.shortBreakDuration < 1 || newSettings.shortBreakDuration > 30 ||
+          newSettings.longBreakDuration < 1 || newSettings.longBreakDuration > 60 ||
+          newSettings.sessionsUntilLongBreak < 2 || newSettings.sessionsUntilLongBreak > 10) {
+        alert('Please enter valid durations within the specified ranges.');
+        return;
+      }
+      
+      pomodoroSettings = newSettings;
+      await savePomodoroSettings();
+      
+      // Reset timer with new work duration if not currently running
+      if (!pomodoroIsRunning && !pomodoroIsBreak) {
+        pomodoroTimeLeft = pomodoroSettings.workDuration * 60;
+        updatePomodoroDisplay();
+      }
+      
+      hidePomodoroSettingsModal();
+    };
+    
+    const cancelHandler = () => {
+      hidePomodoroSettingsModal();
+    };
+    
+    saveBtn.onclick = saveHandler;
+    cancelBtn.onclick = cancelHandler;
+    
+    // Handle escape key
+    const escapeHandler = (e) => {
+      if (e.key === 'Escape') {
+        hidePomodoroSettingsModal();
+        document.removeEventListener('keydown', escapeHandler);
+      }
+    };
+    document.addEventListener('keydown', escapeHandler);
+  }
+
+  function hidePomodoroSettingsModal() {
+    const modal = document.getElementById('pomodoro-settings-modal');
+    modal.style.display = 'none';
+  }
+
+  // Focus mode warning notification
+  function showFocusWarningNotification(hostname) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #FF6B35;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 10000;
+      max-width: 300px;
+      animation: slideIn 0.3s ease;
+    `;
+    
+    notification.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 5px;">Focus Mode Warning</div>
+      <div style="font-size: 14px;">You're visiting ${hostname} - try to stay focused!</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
 
   // Privacy Modal Functions
   function showAIPrivacyModal() {
@@ -4159,4 +5321,3 @@ window.removeDownloadNotification = removeDownloadNotification;
 window.openDownloadFolder = openDownloadFolder;
 window.retryDownload = retryDownload;
 window.cancelDownload = cancelDownload;
-window.moveTabToGroup = moveTabToGroup;

@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@sentry/electron": "^5.12.0",
+    "abp-filter-parser": "^0.1.10",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.0.0",
     "file-icon-vectors": "^1.0.0"
